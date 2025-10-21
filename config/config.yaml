@@ -1,0 +1,118 @@
+# AI Search Engine Configuration
+
+# LLM Providers Configuration
+llm:
+  # OpenAI Configuration
+  openai:
+    enabled: false  # Disable if not using OpenAI directly
+    api_key: ${OPENAI_API_KEY}
+    model: gpt-3.5-turbo
+    temperature: 0.7
+    max_tokens: 2000
+    # Custom API endpoint (optional, defaults to https://api.openai.com/v1)
+    base_url: https://api.openai.com/v1
+    provider_name: "OpenAI"
+
+  # Aliyun DashScope Configuration (Qwen models via OpenAI-compatible API)
+  # Documentation: https://help.aliyun.com/zh/dashscope/developer-reference/
+  dashscope:
+    enabled: true
+    api_key: ${DASHSCOPE_API_KEY}
+    model: qwen3-max
+    temperature: 0.7
+    max_tokens: 20000
+    base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+    provider_name: "Aliyun DashScope"
+
+  # Ollama Local Model Configuration
+  ollama:
+    enabled: false
+    base_url: http://localhost:11434
+    model: llama2
+    temperature: 0.7
+
+  # OpenAI-compatible APIs (same format as OpenAI but different endpoints)
+  # These use the OpenAI client with custom base URLs
+  openai_compatible:
+    # DeepSeek - https://deepseek.com
+    deepseek:
+      enabled: false
+      api_key: ${DEEPSEEK_API_KEY}
+      model: deepseek-chat
+      base_url: https://api.deepseek.com
+      temperature: 0.7
+      max_tokens: 2000
+      provider_name: "DeepSeek"
+
+    # Claude (via OpenAI-compatible endpoint if available)
+    # Note: Claude API uses different format, this is for reference
+    # claude:
+    #   enabled: false
+    #   api_key: ${ANTHROPIC_API_KEY}
+    #   model: claude-3-sonnet
+    #   base_url: https://api.anthropic.com/v1
+    #   provider_name: "Claude"
+
+    # Local OpenAI-compatible server (e.g., LM Studio, vLLM)
+    local_compatible:
+      enabled: false
+      api_key: "local-key"
+      model: llama-2
+      base_url: http://localhost:8000/v1
+      temperature: 0.7
+      max_tokens: 2000
+      provider_name: "LocalOpenAI"
+
+    # Other OpenAI-compatible providers
+    # Example: Together AI, Replicate, etc.
+    # together_ai:
+    #   enabled: false
+    #   api_key: ${TOGETHER_API_KEY}
+    #   model: meta-llama/Llama-2-7b-hf
+    #   base_url: https://api.together.xyz/v1
+    #   provider_name: "TogetherAI"
+
+# Search Configuration
+search:
+  provider: serpapi  # Options: serpapi, google_search, bing
+  serpapi_key: ${SERPAPI_API_KEY}
+  results_per_query: 5
+  timeout: 10
+
+# Web Scraping Configuration
+scraper:
+  timeout: 10
+  max_workers: 5
+  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+
+# Code Execution Configuration
+code_execution:
+  timeout: 30
+  max_output_lines: 1000
+  allowed_imports:
+    - numpy
+    - pandas
+    - scipy
+    - matplotlib
+    - sympy
+    - math
+    - statistics
+
+# Research Agent Configuration
+research:
+  max_queries: 5
+  top_results_per_query: 3
+  summary_max_tokens: 5000
+
+# CLI Configuration
+cli:
+  theme: monokai
+  verbose: false
+  show_sources: true
+
+# Cache Configuration
+cache:
+  enabled: true
+  ttl_seconds: 3600
+  backend: sqlite  # Options: sqlite, redis
+  db_path: ./cache/search_cache.db

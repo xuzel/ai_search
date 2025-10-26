@@ -71,6 +71,38 @@ search:
 
 ## 使用方法
 
+### Web 界面（推荐）
+
+启动 Web 服务器：
+
+```bash
+# 方式 1: 使用 Python 模块
+python -m src.web.app
+
+# 方式 2: 使用 uvicorn
+uvicorn src.web.app:app --reload --host 0.0.0.0 --port 8000
+```
+
+然后在浏览器中打开 `http://localhost:8000`
+
+#### Web UI 功能
+
+- **🏠 首页**：统一搜索入口，自动智能路由
+- **🔍 研究模式**：网络搜索，显示来源和摘要（Markdown 渲染）
+- **💻 代码模式**：代码生成和执行，语法高亮，一键复制
+- **💬 聊天模式**：对话界面，支持流式输出（打字机效果）
+- **📚 历史记录**：查看、搜索、管理所有对话历史
+- **🎨 设计风格**：温暖中性色调，优雅简约
+
+#### Web 配置
+
+通过环境变量配置：
+
+```bash
+export WEB_HOST="0.0.0.0"  # 默认 0.0.0.0
+export WEB_PORT="8000"      # 默认 8000
+```
+
 ### 命令行界面
 
 #### 1. 研究模式
@@ -158,12 +190,35 @@ ai_search/
 │   │   ├── search.py           # 搜索工具
 │   │   ├── scraper.py          # 网页爬虫
 │   │   └── code_executor.py    # 代码执行器
-│   └── utils/
+│   ├── utils/
+│   │   ├── __init__.py
+│   │   ├── config.py           # 配置管理
+│   │   └── logger.py           # 日志
+│   └── web/                    # 🌐 Web UI (NEW)
 │       ├── __init__.py
-│       ├── config.py           # 配置管理
-│       └── logger.py           # 日志
+│       ├── app.py              # FastAPI 主应用
+│       ├── database.py         # 历史记录数据库
+│       ├── routers/            # 路由模块
+│       │   ├── main.py         # 首页
+│       │   ├── search.py       # 研究模式
+│       │   ├── code.py         # 代码模式
+│       │   ├── chat.py         # 聊天模式
+│       │   └── history.py      # 历史记录
+│       ├── static/             # 静态资源
+│       │   ├── css/style.css   # 样式表
+│       │   └── js/main.js      # JavaScript
+│       └── templates/          # Jinja2 模板
+│           ├── base.html
+│           ├── index.html
+│           ├── search_result.html
+│           ├── code_result.html
+│           ├── chat.html
+│           ├── history.html
+│           └── components/
 ├── config/
 │   └── config.yaml             # 主配置文件
+├── data/                       # 数据文件夹
+│   └── history.db              # SQLite 历史记录
 ├── docs/                       # 📚 文档文件夹
 │   ├── QUICKSTART.md           # 快速开始
 │   ├── ARCHITECTURE.md         # 架构设计

@@ -1,0 +1,16 @@
+<!-- History List Component -->
+{% if conversations %}
+    {% for conv in conversations %}
+    <div class="history-item" data-id="{{ conv.id }}">
+        <div class="history-item-meta">
+            <span class="history-item-mode">{{ conv.mode }}</span>
+            <span class="history-item-time">{{ conv.timestamp[:10] }}</span>
+        </div>
+        <div class="history-item-query">
+            {{ conv.query[:80] }}{% if conv.query|length > 80 %}...{% endif %}
+        </div>
+    </div>
+    {% endfor %}
+{% else %}
+    <p class="text-muted">No conversations found{% if search_query %} for "{{ search_query }}"{% endif %}</p>
+{% endif %}

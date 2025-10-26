@@ -1,0 +1,35 @@
+<!-- Conversation Detail Component -->
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
+        <div>
+            <span class="badge" style="background-color: var(--accent-warm); color: white; padding: 0.25rem 0.5rem; border-radius: var(--radius-sm); font-size: 0.75rem;">
+                {{ conversation.mode }}
+            </span>
+            <span class="text-muted" style="margin-left: 0.5rem; font-size: 0.875rem;">
+                {{ conversation.timestamp }}
+            </span>
+        </div>
+        <button
+            class="btn btn-secondary"
+            style="padding: 0.25rem 0.5rem; font-size: 0.875rem;"
+            hx-delete="/history/{{ conversation.id }}"
+            hx-confirm="Delete this conversation?"
+            hx-target="closest .card"
+            hx-swap="outerHTML"
+        >
+            Delete
+        </button>
+    </div>
+
+    <div style="margin-bottom: 1rem;">
+        <strong>Query:</strong>
+        <p style="margin-top: 0.5rem;">{{ conversation.query }}</p>
+    </div>
+
+    <div>
+        <strong>Response:</strong>
+        <p style="margin-top: 0.5rem; color: var(--text-secondary);">
+            {{ conversation.response[:500] }}{% if conversation.response|length > 500 %}...{% endif %}
+        </p>
+    </div>
+</div>

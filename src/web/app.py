@@ -1,0 +1,91 @@
+"""FastAPI Web Application for AI Search Engine"""
+
+import os
+from pathlib import Path
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from fastapi.middleware.cors import CORSMiddleware
+
+from src.web import database
+from src.web.routers import main, search, code, chat, history
+from src.utils import get_logger
+
+logger = get_logger(__name__)
+
+
+# Lifespan context manager for startup/shutdown events
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan manager"""
+    # Startup
+    logger.info("Starting AI Search Engine Web UI...")
+    await database.init_db()
+    logger.info("Database initialized")
+    yield
+    # Shutdown
+    logger.info("Shutting down AI Search Engine Web UI...")
+
+
+# Create FastAPI app
+app = FastAPI(
+    title="AI Search Engine",
+    description="LLM-powered search engine with research, code execution, and chat capabilities",
+    version="1.0.0",
+    lifespan=lifespan
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Get paths
+BASE_DIR = Path(__file__).parent
+STATIC_DIR = BASE_DIR / "static"
+TEMPLATES_DIR = BASE_DIR / "templates"
+
+# Mount static files
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+# Setup templates
+templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+
+# Make templates available to routers
+app.state.templates = templates
+
+# Include routers
+app.include_router(main.router, tags=["main"])
+app.include_router(search.router, prefix="/search", tags=["search"])
+app.include_router(code.router, prefix="/code", tags=["code"])
+app.include_router(chat.router, prefix="/chat", tags=["chat"])
+app.include_router(history.router, prefix="/history", tags=["history"])
+
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    return {"status": "ok", "message": "AI Search Engine is running"}
+
+
+# Run with: uvicorn src.web.app:app --reload --host 0.0.0.0 --port 8000
+if __name__ == "__main__":
+    import uvicorn
+
+    host = os.getenv("WEB_HOST", "0.0.0.0")
+    port = int(os.getenv("WEB_PORT", "8000"))
+
+    logger.info(f"Starting server on {host}:{port}")
+    uvicorn.run(
+        "src.web.app:app",
+        host=host,
+        port=port,
+        reload=True,
+        log_level="info"
+    )

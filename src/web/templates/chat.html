@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}Chat - AI Search Engine{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="chat-container">
+        <!-- Chat Sidebar (History) -->
+        <div class="chat-sidebar">
+            <h3 style="margin-bottom: 1rem;">Chat History</h3>
+            <div style="margin-bottom: 1rem;">
+                <button
+                    class="btn btn-secondary"
+                    style="width: 100%;"
+                    hx-post="/chat/clear"
+                    hx-confirm="Clear all chat history?"
+                >
+                    Clear History
+                </button>
+            </div>
+            <div id="history-sidebar">
+                <p class="text-muted" style="font-size: 0.85rem;">
+                    Your conversation history will appear here
+                </p>
+            </div>
+        </div>
+
+        <!-- Main Chat Area -->
+        <div class="chat-main">
+            <div class="chat-messages" id="chat-messages">
+                <div class="chat-message assistant">
+                    <p>Hello! I'm your AI assistant. How can I help you today?</p>
+                </div>
+            </div>
+
+            <!-- Chat Input -->
+            <form
+                id="chat-form"
+                hx-post="/chat/message"
+                hx-target="#chat-messages"
+                hx-swap="beforeend"
+                hx-on::after-request="document.getElementById('chat-form').reset(); scrollToBottom();"
+            >
+                <div class="chat-input-container">
+                    <input
+                        type="text"
+                        name="message"
+                        class="form-input chat-input"
+                        placeholder="Type your message..."
+                        autocomplete="off"
+                        required
+                    >
+                    <button type="submit" class="btn btn-primary">Send</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function scrollToBottom() {
+    const messages = document.getElementById('chat-messages');
+    messages.scrollTop = messages.scrollHeight;
+}
+
+// Add user message to chat before sending
+document.getElementById('chat-form').addEventListener('htmx:configRequest', function(evt) {
+    const message = evt.detail.parameters.message;
+    if (message) {
+        const messagesContainer = document.getElementById('chat-messages');
+        const userMessageDiv = document.createElement('div');
+        userMessageDiv.className = 'chat-message user';
+        userMessageDiv.innerHTML = `<p>${escapeHtml(message)}</p>`;
+        messagesContainer.appendChild(userMessageDiv);
+        scrollToBottom();
+    }
+});
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Auto-scroll on page load
+window.addEventListener('DOMContentLoaded', scrollToBottom);
+</script>
+{% endblock %}

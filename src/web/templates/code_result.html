@@ -1,0 +1,103 @@
+<!-- Code Result Template -->
+<div class="result-container">
+    {% if success %}
+        <div class="result-header">
+            <h2>Code Execution Result</h2>
+            <p class="result-query">Problem: "{{ query }}"</p>
+        </div>
+
+        <!-- Generated Code -->
+        <div class="card mb-3">
+            <h3 class="card-title">Generated Code</h3>
+            <div class="code-container">
+                <div class="code-header">
+                    <span>Python</span>
+                    <button class="code-copy-btn" onclick="copyCode()">Copy Code</button>
+                </div>
+                <style>{{ pygments_css | safe }}</style>
+                {{ code_html | safe }}
+            </div>
+        </div>
+
+        <!-- Output -->
+        {% if output %}
+        <div class="card mb-3">
+            <h3 class="card-title text-success">Output</h3>
+            <pre style="background-color: var(--bg-tertiary); padding: 1rem; border-radius: var(--radius-md); overflow-x: auto; color: var(--text-primary);">{{ output }}</pre>
+        </div>
+        {% endif %}
+
+        <!-- Explanation -->
+        {% if explanation %}
+        <div class="card mb-3">
+            <h3 class="card-title">Explanation</h3>
+            <p>{{ explanation }}</p>
+        </div>
+        {% endif %}
+
+        <!-- Action Buttons -->
+        <div style="margin-top: 2rem; text-align: center;">
+            <button class="btn btn-secondary" onclick="location.reload()">
+                New Problem
+            </button>
+        </div>
+
+    {% else %}
+        <!-- Error State -->
+        <div class="card" style="border-left: 4px solid var(--error);">
+            <h3 class="card-title text-error">Execution Failed</h3>
+            <p>Problem: "{{ query }}"</p>
+
+            {% if code_html %}
+            <div class="code-container" style="margin: 1rem 0;">
+                <div class="code-header">
+                    <span>Generated Code (Failed)</span>
+                    <button class="code-copy-btn" onclick="copyCode()">Copy Code</button>
+                </div>
+                <style>{{ pygments_css | safe }}</style>
+                {{ code_html | safe }}
+            </div>
+            {% endif %}
+
+            <div class="mt-2">
+                <strong class="text-error">Error:</strong>
+                <pre style="background-color: #FEE; padding: 1rem; border-radius: var(--radius-md); color: var(--error);">{{ error }}</pre>
+            </div>
+
+            {% if explanation %}
+            <div class="mt-2">
+                <strong>Explanation:</strong>
+                <p>{{ explanation }}</p>
+            </div>
+            {% endif %}
+
+            <div style="margin-top: 1rem;">
+                <button class="btn btn-secondary" onclick="location.reload()">
+                    Try Again
+                </button>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<script>
+// Hidden textarea to hold code for copying
+<textarea id="code-raw" style="position: absolute; left: -9999px;">{{ code_raw }}</textarea>
+
+function copyCode() {
+    const codeText = document.getElementById('code-raw').value;
+    navigator.clipboard.writeText(codeText).then(() => {
+        const btn = document.querySelector('.code-copy-btn');
+        const originalText = btn.textContent;
+        btn.textContent = 'Copied!';
+        btn.style.backgroundColor = 'var(--success)';
+        setTimeout(() => {
+            btn.textContent = originalText;
+            btn.style.backgroundColor = '';
+        }, 2000);
+    }).catch(err => {
+        console.error('Failed to copy code:', err);
+        alert('Failed to copy code');
+    });
+}
+</script>

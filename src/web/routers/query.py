@@ -10,6 +10,7 @@ from markdown.extensions.fenced_code import FencedCodeExtension
 from markdown.extensions.tables import TableExtension
 
 from src.router import Router, TaskType
+from src.cn_llm_router import ChineseIntelligentRouter, RoutingDecision
 from src.llm import LLMManager
 from src.agents import ResearchAgent, CodeAgent, ChatAgent
 from src.tools import SearchTool, CodeExecutor, ScraperTool, HybridReranker, Reranker, CredibilityScorer, WeatherTool, FinanceTool, RoutingTool
@@ -23,6 +24,7 @@ router = APIRouter()
 # Global instances (initialized once)
 config = None
 llm_manager = None
+llm_router = None  # NEW: LLM-based intelligent router
 research_agent = None
 code_agent = None
 chat_agent = None
@@ -35,7 +37,7 @@ routing_tool = None
 
 async def initialize_agents():
     """Initialize all agents and tools"""
-    global config, llm_manager, research_agent, code_agent, chat_agent, reranker, credibility_scorer, weather_tool, finance_tool, routing_tool
+    global config, llm_manager, llm_router, research_agent, code_agent, chat_agent, reranker, credibility_scorer, weather_tool, finance_tool, routing_tool
 
     if llm_manager is None:
         config = get_config()
@@ -43,6 +45,10 @@ async def initialize_agents():
 
         # Initialize router (no constructor arguments needed)
         query_router = Router()
+
+        # Initialize LLM-based intelligent router (NEW)
+        llm_router = ChineseIntelligentRouter(llm_manager)
+        logger.info("ChineseIntelligentRouter initialized (LLM-based routing)")
 
         # Initialize tools
         search_tool = SearchTool(api_key=config.search.serpapi_key)
@@ -122,11 +128,21 @@ async def unified_query(request: Request, query: str = Form(...)):
     templates = request.app.state.templates
 
     try:
-        # Step 1: Classify query
-        logger.info(f"Classifying query: {query}")
-        task_type, confidence, reason = await Router.classify_hybrid(query, llm_manager=llm_manager)
+        # Step 1: Classify query using LLM-based intelligent router (NEW)
+        logger.info(f"Classifying query with LLM-based router: {query}")
+        routing_decision: RoutingDecision = await llm_router.route_query(
+            query=query,
+            context={'language': 'zh'}  # Chinese context
+        )
+
+        task_type = routing_decision.primary_task_type
+        confidence = routing_decision.task_confidence
+        reason = routing_decision.reasoning
 
         logger.info(f"Classified as {task_type.value} with confidence {confidence:.2f} - {reason}")
+        logger.info(f"Tools needed: {[tool.tool_name for tool in routing_decision.tools_needed]}")
+        if routing_decision.multi_intent:
+            logger.info(f"Multi-intent query detected")
 
         # Step 2: Route to appropriate agent
         if task_type == TaskType.RESEARCH:

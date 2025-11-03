@@ -35,6 +35,7 @@ class Router:
     RESEARCH_KEYWORDS = [
         "search", "find", "查询", "搜索", "查找", "了解",
         "what is", "who is", "when was", "where is",
+        "是什么", "什么是",  # Chinese "what is" patterns
         "explain", "tell me about", "information about",
     ]
 

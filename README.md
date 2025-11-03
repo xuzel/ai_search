@@ -348,36 +348,63 @@ MIT License
 
 ---
 
-## 📚 文档
+## 📚 完整文档系统
 
-详细的文档位于 `docs/` 文件夹。主要文档包括：
+详细的文档位于 `docs/` 文件夹。我们提供了一套完整的29份文档，包括快速开始、架构设计、功能指南、API参考等。
 
-### 快速开始
-- [QUICKSTART.md](docs/QUICKSTART.md) - 快速开始指南
-- [QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md) - 快速参考卡片
+**👉 [文档导航中心 (00-INDEX.md)](docs/00-INDEX.md)** - 推荐首先查看此文档获得完整导航
 
-### 系统架构与设计
-- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - 系统架构概览
-- [IMPLEMENTATION_SUMMARY.md](docs/IMPLEMENTATION_SUMMARY.md) - 实现总结
+### 📗 快速开始层 (3份文档)
+- [01-QUICKSTART.md](docs/01-QUICKSTART.md) - 5分钟快速上手
+- [02-INSTALLATION.md](docs/02-INSTALLATION.md) - 完整安装与配置指南
+- [00-INDEX.md](docs/00-INDEX.md) - 文档导航中心
 
-### 功能指南
-- [USAGE_GUIDE.md](docs/USAGE_GUIDE.md) - 使用指南
-- [API_ENDPOINTS_GUIDE.md](docs/API_ENDPOINTS_GUIDE.md) - API端点指南
+### 📘 核心概念层 (4份文档)
+- [10-ARCHITECTURE.md](docs/10-ARCHITECTURE.md) - 系统架构设计
+- [11-INTELLIGENT-ROUTING.md](docs/11-INTELLIGENT-ROUTING.md) - 智能路由与分类器
+- [12-AGENT-SYSTEM.md](docs/12-AGENT-SYSTEM.md) - Agent系统详解
+- [13-DATA-FLOW.md](docs/13-DATA-FLOW.md) - 数据流程架构
 
-### 路由系统
-- [ROUTER_UPGRADE_SUMMARY.md](docs/ROUTER_UPGRADE_SUMMARY.md) - 路由系统升级总结
-- [LLM_ROUTING_GUIDE.md](docs/LLM_ROUTING_GUIDE.md) - LLM 路由详细指南
-- [ROUTING_IMPROVEMENTS.md](docs/ROUTING_IMPROVEMENTS.md) - 路由改进说明
+### 📙 功能指南层 (11份文档)
+- [20-FEATURE-RESEARCH.md](docs/20-FEATURE-RESEARCH.md) - 网页搜索与研究模式
+- [21-FEATURE-CODE.md](docs/21-FEATURE-CODE.md) - 代码生成与执行
+- [22-FEATURE-CHAT.md](docs/22-FEATURE-CHAT.md) - 对话聊天模式
+- [23-FEATURE-RAG.md](docs/23-FEATURE-RAG.md) - RAG文档检索系统
+- [24-FEATURE-RERANKING.md](docs/24-FEATURE-RERANKING.md) - 结果重排序器
+- [25-FEATURE-WEATHER.md](docs/25-FEATURE-WEATHER.md) - 天气查询功能
+- [26-FEATURE-FINANCE.md](docs/26-FEATURE-FINANCE.md) - 金融数据工具
+- [27-FEATURE-ROUTING.md](docs/27-FEATURE-ROUTING.md) - 查询路由器
+- [28-FEATURE-OCR.md](docs/28-FEATURE-OCR.md) - OCR图片文字识别
+- [29-FEATURE-VISION.md](docs/29-FEATURE-VISION.md) - Vision图像理解
+- [30-FEATURE-WORKFLOW.md](docs/30-FEATURE-WORKFLOW.md) - 工作流编排器
 
-### 配置指南
-- [CLAUDE.md](docs/CLAUDE.md) - Claude Code 开发指南
-- [MODEL_SELECTION_GUIDE.md](docs/MODEL_SELECTION_GUIDE.md) - 模型选择指南
-- [CUSTOM_URL_SETUP.md](docs/CUSTOM_URL_SETUP.md) - 自定义URL设置
-- [ALIYUN_DASHSCOPE_SETUP.md](docs/ALIYUN_DASHSCOPE_SETUP.md) - 阿里云DashScope设置
+### 📕 API参考层 (3份文档)
+- [40-API-AGENTS.md](docs/40-API-AGENTS.md) - Agents API完整文档
+- [41-API-TOOLS.md](docs/41-API-TOOLS.md) - Tools API完整文档
+- [42-API-WEB-ENDPOINTS.md](docs/42-API-WEB-ENDPOINTS.md) - Web端点接口文档
 
-### 参考资料
-- [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) - 故障排除
-- [FILE_MANIFEST.md](docs/FILE_MANIFEST.md) - 文件清单
-- [PROJECT_COMPLETION_REPORT.md](docs/PROJECT_COMPLETION_REPORT.md) - 项目完成报告
-- [CUSTOM_API_SUMMARY.md](docs/CUSTOM_API_SUMMARY.md) - 自定义API总结
-- [DASHSCOPE_SETUP_GUIDE.md](docs/DASHSCOPE_SETUP_GUIDE.md) - DashScope设置指南
+### 📺 Web UI层 (2份文档)
+- [50-WEB-UI-OVERVIEW.md](docs/50-WEB-UI-OVERVIEW.md) - Web界面总览
+- [51-WEB-UI-HTMX.md](docs/51-WEB-UI-HTMX.md) - HTMX交互开发
+
+### ⚙️ 配置层 (2份文档)
+- [60-CONFIGURATION-LLM.md](docs/60-CONFIGURATION-LLM.md) - LLM提供商配置
+- [61-CONFIGURATION-APIS.md](docs/61-CONFIGURATION-APIS.md) - 外部API密钥配置
+
+### 🔧 开发层 (2份文档)
+- [70-DEVELOPMENT-GUIDE.md](docs/70-DEVELOPMENT-GUIDE.md) - 开发者指南
+- [71-TESTING-GUIDE.md](docs/71-TESTING-GUIDE.md) - 测试指南
+
+### 📚 参考层 (2份文档)
+- [80-TROUBLESHOOTING.md](docs/80-TROUBLESHOOTING.md) - 故障排查手册
+- [81-FAQ.md](docs/81-FAQ.md) - 常见问题解答
+
+---
+
+### 快速链接
+
+**新手入门**: [01-QUICKSTART.md](docs/01-QUICKSTART.md) → [50-WEB-UI-OVERVIEW.md](docs/50-WEB-UI-OVERVIEW.md)
+
+**深入学习**: [10-ARCHITECTURE.md](docs/10-ARCHITECTURE.md) → [12-AGENT-SYSTEM.md](docs/12-AGENT-SYSTEM.md) → [70-DEVELOPMENT-GUIDE.md](docs/70-DEVELOPMENT-GUIDE.md)
+
+**遇到问题**: [80-TROUBLESHOOTING.md](docs/80-TROUBLESHOOTING.md) → [81-FAQ.md](docs/81-FAQ.md)

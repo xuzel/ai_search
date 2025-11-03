@@ -1,0 +1,13 @@
+<!-- Loading Component -->
+<div class="loading-container">
+  <div class="spinner"></div>
+  <div class="loading-text">{{ message | default('Processing...') }}</div>
+  {% if progress %}
+  <div class="progress-bar-container" style="width: 300px; margin-top: var(--space-4);">
+    <div class="progress-bar" style="width: {{ progress }}%;"></div>
+  </div>
+  <div style="margin-top: var(--space-2); font-size: var(--text-sm); color: var(--text-secondary);">
+    {{ progress }}% complete
+  </div>
+  {% endif %}
+</div>

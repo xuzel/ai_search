@@ -1,0 +1,165 @@
+<!-- Vision Analysis Result -->
+<div class="result-card">
+  <div class="result-header">
+    <h2 class="result-title">🤖 Vision Analysis Result</h2>
+    <div class="result-meta">
+      <span class="badge badge-info">Vision</span>
+      <span>{{ filename }}</span>
+    </div>
+  </div>
+
+  <!-- Query Display -->
+  <div style="padding: var(--space-4); background-color: var(--bg-tertiary); border-radius: var(--radius-md); margin-bottom: var(--space-4);">
+    <div style="font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-2);">
+      Analysis Query:
+    </div>
+    <div style="font-weight: 500; color: var(--text-primary);">
+      {{ query }}
+    </div>
+  </div>
+
+  <!-- Statistics -->
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-6);">
+    {% if result.objects %}
+    <div class="card" style="padding: var(--space-3);">
+      <div style="text-align: center;">
+        <div style="font-size: var(--text-2xl); font-weight: 700; color: var(--color-primary);">
+          {{ result.objects|length }}
+        </div>
+        <div style="font-size: var(--text-sm); color: var(--text-secondary); margin-top: var(--space-1);">
+          Objects Detected
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if result.text %}
+    <div class="card" style="padding: var(--space-3);">
+      <div style="text-align: center;">
+        <div style="font-size: 24px;">📝</div>
+        <div style="font-size: var(--text-sm); color: var(--text-secondary); margin-top: var(--space-1);">
+          Text Detected
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if result.tags %}
+    <div class="card" style="padding: var(--space-3);">
+      <div style="text-align: center;">
+        <div style="font-size: var(--text-2xl); font-weight: 700; color: var(--color-warning);">
+          {{ result.tags|length }}
+        </div>
+        <div style="font-size: var(--text-sm); color: var(--text-secondary); margin-top: var(--space-1);">
+          Tags
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Markdown Rendered Analysis -->
+  {% if result.markdown %}
+  <div class="result-content markdown-content">
+    {{ result.markdown|safe }}
+  </div>
+  {% endif %}
+
+  <!-- Objects List (if available) -->
+  {% if result.objects %}
+  <div style="margin-top: var(--space-6);">
+    <h3 style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-3); color: var(--text-primary);">
+      🎯 Detected Objects
+    </h3>
+    <div style="display: flex; flex-wrap: wrap; gap: var(--space-2);">
+      {% for obj in result.objects %}
+      <span class="badge badge-primary">{{ obj }}</span>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Tags (if available) -->
+  {% if result.tags %}
+  <div style="margin-top: var(--space-6);">
+    <h3 style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-3); color: var(--text-primary);">
+      🏷️ Tags
+    </h3>
+    <div style="display: flex; flex-wrap: wrap; gap: var(--space-2);">
+      {% for tag in result.tags %}
+      <span class="badge badge-secondary">#{{ tag }}</span>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Detected Text (if available) -->
+  {% if result.text %}
+  <div style="margin-top: var(--space-6);">
+    <h3 style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-3); color: var(--text-primary);">
+      📋 Detected Text
+    </h3>
+    <div style="padding: var(--space-4); background-color: var(--bg-secondary); border-radius: var(--radius-md); border-left: 4px solid var(--color-info);">
+      <div style="font-family: monospace; font-size: var(--text-sm); line-height: 1.6; color: var(--text-secondary); white-space: pre-wrap; word-break: break-word;">
+{{ result.text }}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Action Buttons -->
+  <div style="display: flex; gap: var(--space-2); margin-top: var(--space-6);">
+    <button
+      type="button"
+      class="btn btn-ghost btn-sm"
+      onclick="window.location.href = '/multimodal'"
+    >
+      ← Back
+    </button>
+    <button
+      type="button"
+      class="btn btn-primary btn-sm"
+      onclick="window.location.reload()"
+    >
+      🔄 New Analysis
+    </button>
+  </div>
+</div>
+
+<style>
+.markdown-content {
+  overflow-x: auto;
+}
+
+.markdown-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: var(--space-3) 0;
+}
+
+.markdown-content th,
+.markdown-content td {
+  border: 1px solid var(--border-color);
+  padding: var(--space-2);
+  text-align: left;
+}
+
+.markdown-content th {
+  background-color: var(--bg-tertiary);
+  font-weight: 600;
+}
+
+.markdown-content code {
+  background-color: var(--bg-tertiary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+.markdown-content pre {
+  background-color: var(--bg-secondary);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+}
+</style>

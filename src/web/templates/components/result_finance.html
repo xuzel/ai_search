@@ -1,0 +1,176 @@
+<!-- Finance Result -->
+<div class="result-card">
+  <div class="result-header">
+    <h2 class="result-title">📈 Stock Market Data</h2>
+    <div class="result-meta">
+      <span class="badge badge-info">Finance</span>
+      <span>{{ symbol }}</span>
+    </div>
+  </div>
+
+  <!-- Query Display -->
+  <div style="padding: var(--space-4); background-color: var(--bg-tertiary); border-radius: var(--radius-md); margin-bottom: var(--space-4);">
+    <div style="font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-2);">
+      Stock Symbol:
+    </div>
+    <div style="font-weight: 500; color: var(--text-primary);">
+      {{ symbol }}
+    </div>
+  </div>
+
+  <!-- Price Statistics -->
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-6);">
+    <div class="card" style="padding: var(--space-3);">
+      <div style="text-align: center;">
+        <div style="font-size: 24px;">💰</div>
+        <div style="font-size: var(--text-2xl); font-weight: 700; color: var(--color-primary); margin: var(--space-2) 0;">
+          ${{ result.current_price }}
+        </div>
+        <div style="font-size: var(--text-sm); color: var(--text-secondary);">
+          Current Price
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="padding: var(--space-3);">
+      <div style="text-align: center;">
+        <div style="font-size: 24px;">{% if '+' in result.change %}📈{% else %}📉{% endif %}</div>
+        <div style="font-size: var(--text-lg); font-weight: 700; color: {% if '+' in result.change %}var(--color-success){% else %}var(--color-danger){% endif %}; margin: var(--space-2) 0;">
+          {{ result.change }}
+        </div>
+        <div style="font-size: var(--text-sm); color: var(--text-secondary);">
+          Change
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="padding: var(--space-3);">
+      <div style="text-align: center;">
+        <div style="font-size: 24px;">🎯</div>
+        <div style="font-size: var(--text-2xl); font-weight: 700; color: var(--color-warning); margin: var(--space-2) 0;">
+          {{ result.pe_ratio }}
+        </div>
+        <div style="font-size: var(--text-sm); color: var(--text-secondary);">
+          P/E Ratio
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="padding: var(--space-3);">
+      <div style="text-align: center;">
+        <div style="font-size: 24px;">💼</div>
+        <div style="font-size: var(--text-lg); font-weight: 700; color: var(--color-info); margin: var(--space-2) 0; word-break: break-word;">
+          {{ result.market_cap }}
+        </div>
+        <div style="font-size: var(--text-sm); color: var(--text-secondary);">
+          Market Cap
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Markdown Rendered Result -->
+  {% if result.markdown %}
+  <div class="result-content markdown-content">
+    {{ result.markdown|safe }}
+  </div>
+  {% endif %}
+
+  <!-- Key Metrics -->
+  <div style="margin-top: var(--space-6);">
+    <h3 style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-4); color: var(--text-primary);">
+      📊 Key Metrics
+    </h3>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4);">
+      <div style="padding: var(--space-4); background-color: var(--bg-secondary); border-radius: var(--radius-md);">
+        <div style="font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-2);">Dividend Yield</div>
+        <div style="font-size: var(--text-xl); font-weight: 700; color: var(--text-primary);">
+          {{ result.dividend_yield }}
+        </div>
+      </div>
+      <div style="padding: var(--space-4); background-color: var(--bg-secondary); border-radius: var(--radius-md);">
+        <div style="font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-2);">52-Week High</div>
+        <div style="font-size: var(--text-xl); font-weight: 700; color: var(--text-primary);">
+          ${{ result['52_week_high'] }}
+        </div>
+      </div>
+      <div style="padding: var(--space-4); background-color: var(--bg-secondary); border-radius: var(--radius-md);">
+        <div style="font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-2);">52-Week Low</div>
+        <div style="font-size: var(--text-xl); font-weight: 700; color: var(--text-primary);">
+          ${{ result['52_week_low'] }}
+        </div>
+      </div>
+      <div style="padding: var(--space-4); background-color: var(--bg-secondary); border-radius: var(--radius-md);">
+        <div style="font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-2);">Average Volume</div>
+        <div style="font-size: var(--text-xl); font-weight: 700; color: var(--text-primary);">
+          {{ result.avg_volume }}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Performance Chart Placeholder -->
+  <div style="margin-top: var(--space-6); padding: var(--space-6); background-color: var(--bg-secondary); border-radius: var(--radius-md); text-align: center; color: var(--text-secondary);">
+    <div style="font-size: 24px; margin-bottom: var(--space-2);">📊</div>
+    <div>Historical price chart would be displayed here</div>
+    <div style="font-size: var(--text-sm); margin-top: var(--space-2);">
+      Data visualization requires additional charting library integration
+    </div>
+  </div>
+
+  <!-- Action Buttons -->
+  <div style="display: flex; gap: var(--space-2); margin-top: var(--space-6);">
+    <button
+      type="button"
+      class="btn btn-ghost btn-sm"
+      onclick="window.location.href = '/tools'"
+    >
+      ← Back
+    </button>
+    <button
+      type="button"
+      class="btn btn-primary btn-sm"
+      onclick="window.location.reload()"
+    >
+      🔄 New Search
+    </button>
+  </div>
+</div>
+
+<style>
+.markdown-content {
+  overflow-x: auto;
+}
+
+.markdown-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: var(--space-3) 0;
+}
+
+.markdown-content th,
+.markdown-content td {
+  border: 1px solid var(--border-color);
+  padding: var(--space-2);
+  text-align: left;
+}
+
+.markdown-content th {
+  background-color: var(--bg-tertiary);
+  font-weight: 600;
+}
+
+.markdown-content code {
+  background-color: var(--bg-tertiary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+.markdown-content pre {
+  background-color: var(--bg-secondary);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+}
+</style>

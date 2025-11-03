@@ -1,0 +1,223 @@
+{% extends "base_new.html" %}
+
+{% block title %}Image & OCR - AI Search Engine{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div style="margin-bottom: var(--space-8);">
+  <h1 style="font-size: var(--text-3xl); font-weight: 700; margin-bottom: var(--space-2); color: var(--text-primary);">
+    🖼️ Image & OCR Analysis
+  </h1>
+  <p style="color: var(--text-secondary); font-size: var(--text-lg);">
+    Extract text from images with OCR or get AI-powered image analysis with Vision
+  </p>
+</div>
+
+<!-- Status Information -->
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin-bottom: var(--space-8);">
+  {% if ocr_available %}
+  <div class="card" style="border-left: 4px solid var(--color-success);">
+    <div class="card-body">
+      <div style="display: flex; align-items: center; gap: var(--space-2);">
+        <span style="font-size: 24px;">✅</span>
+        <div>
+          <div style="font-weight: 600; color: var(--text-primary);">OCR Ready</div>
+          <div style="font-size: var(--text-sm); color: var(--text-secondary);">Text extraction enabled</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="card" style="border-left: 4px solid var(--color-warning);">
+    <div class="card-body">
+      <div style="display: flex; align-items: center; gap: var(--space-2);">
+        <span style="font-size: 24px;">⚠️</span>
+        <div>
+          <div style="font-weight: 600; color: var(--text-primary);">OCR Unavailable</div>
+          <div style="font-size: var(--text-sm); color: var(--text-secondary);">PaddleOCR not installed</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if vision_available %}
+  <div class="card" style="border-left: 4px solid var(--color-success);">
+    <div class="card-body">
+      <div style="display: flex; align-items: center; gap: var(--space-2);">
+        <span style="font-size: 24px;">✅</span>
+        <div>
+          <div style="font-weight: 600; color: var(--text-primary);">Vision Ready</div>
+          <div style="font-size: var(--text-sm); color: var(--text-secondary);">Image analysis enabled</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="card" style="border-left: 4px solid var(--color-warning);">
+    <div class="card-body">
+      <div style="display: flex; align-items: center; gap: var(--space-2);">
+        <span style="font-size: 24px;">⚠️</span>
+        <div>
+          <div style="font-weight: 600; color: var(--text-primary);">Vision Unavailable</div>
+          <div style="font-size: var(--text-sm); color: var(--text-secondary);">Google Gemini API not configured</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Main Content Grid -->
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6);">
+
+  <!-- Left Column: OCR -->
+  <div>
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">📝 Extract Text (OCR)</h2>
+        <p class="card-subtitle">Recognize text from images</p>
+      </div>
+      <div class="card-body">
+        {% if ocr_available %}
+        <form
+          hx-post="/multimodal/ocr"
+          hx-target="#ocrResult"
+          hx-indicator="#ocrLoading"
+          enctype="multipart/form-data"
+        >
+          <div class="form-group">
+            <label class="form-label">Select Image</label>
+            <input
+              type="file"
+              name="file"
+              accept=".png,.jpg,.jpeg,.bmp,.gif,.webp"
+              class="form-input"
+              required
+            />
+            <div style="font-size: var(--text-sm); color: var(--text-secondary); margin-top: var(--space-2);">
+              Supported: PNG, JPG, JPEG, BMP, GIF, WebP (max 20MB)
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Language</label>
+            <select name="language" class="form-input">
+              <option value="ch">中文 (Chinese)</option>
+              <option value="en">English</option>
+              <option value="auto">Auto Detect</option>
+            </select>
+          </div>
+
+          <button type="submit" class="btn btn-primary" style="width: 100%;">
+            🔍 Extract Text
+          </button>
+
+          <div id="ocrLoading" class="loading-container htmx-indicator" style="margin-top: var(--space-4);">
+            <div class="spinner"></div>
+            <div class="loading-text">Extracting text...</div>
+          </div>
+        </form>
+
+        <div id="ocrResult" style="margin-top: var(--space-4);"></div>
+        {% else %}
+        <div style="padding: var(--space-4); background-color: var(--bg-secondary); border-radius: var(--radius-md); color: var(--text-secondary);">
+          <p style="margin: 0;">⚠️ OCR tool is not available. Please install PaddleOCR to use this feature.</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Column: Vision Analysis -->
+  <div>
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">🤖 Image Analysis (Vision)</h2>
+        <p class="card-subtitle">Get AI-powered insights about images</p>
+      </div>
+      <div class="card-body">
+        {% if vision_available %}
+        <form
+          hx-post="/multimodal/vision"
+          hx-target="#visionResult"
+          hx-indicator="#visionLoading"
+          enctype="multipart/form-data"
+        >
+          <div class="form-group">
+            <label class="form-label">Select Image</label>
+            <input
+              type="file"
+              name="file"
+              accept=".png,.jpg,.jpeg,.bmp,.gif,.webp"
+              class="form-input"
+              required
+            />
+            <div style="font-size: var(--text-sm); color: var(--text-secondary); margin-top: var(--space-2);">
+              Supported: PNG, JPG, JPEG, BMP, GIF, WebP (max 20MB)
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Question (optional)</label>
+            <textarea
+              name="query"
+              class="form-input"
+              rows="2"
+              placeholder="e.g., What objects are in this image? What's the main subject?"
+            ></textarea>
+          </div>
+
+          <button type="submit" class="btn btn-primary" style="width: 100%;">
+            ✨ Analyze Image
+          </button>
+
+          <div id="visionLoading" class="loading-container htmx-indicator" style="margin-top: var(--space-4);">
+            <div class="spinner"></div>
+            <div class="loading-text">Analyzing image...</div>
+          </div>
+        </form>
+
+        <div id="visionResult" style="margin-top: var(--space-4);"></div>
+        {% else %}
+        <div style="padding: var(--space-4); background-color: var(--bg-secondary); border-radius: var(--radius-md); color: var(--text-secondary);">
+          <p style="margin: 0;">⚠️ Vision tool is not available. Please configure Google Gemini API to use this feature.</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Information Section -->
+<div style="margin-top: var(--space-8);">
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">ℹ️ How to Use</h2>
+    </div>
+    <div class="card-body">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6);">
+        <div>
+          <h3 style="font-weight: 600; margin-bottom: var(--space-3); color: var(--text-primary);">OCR - Extract Text</h3>
+          <ol style="margin: 0; padding-left: var(--space-5); color: var(--text-secondary);">
+            <li style="margin-bottom: var(--space-2);">Upload an image containing text</li>
+            <li style="margin-bottom: var(--space-2);">Select the language (Chinese, English, or Auto)</li>
+            <li style="margin-bottom: var(--space-2);">Click "Extract Text" to recognize text</li>
+            <li>View extracted text with confidence scores</li>
+          </ol>
+        </div>
+        <div>
+          <h3 style="font-weight: 600; margin-bottom: var(--space-3); color: var(--text-primary);">Vision - Analyze Images</h3>
+          <ol style="margin: 0; padding-left: var(--space-5); color: var(--text-secondary);">
+            <li style="margin-bottom: var(--space-2);">Upload an image to analyze</li>
+            <li style="margin-bottom: var(--space-2);">Optionally ask a specific question</li>
+            <li style="margin-bottom: var(--space-2);">Click "Analyze Image" for AI insights</li>
+            <li>Get detailed analysis of objects, text, and more</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

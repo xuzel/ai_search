@@ -30,23 +30,42 @@ const utils = {
      * Show toast notification
      */
     showToast(message, type = 'info') {
+        const toastContainer = document.getElementById('toastContainer') || document.body;
         const toast = document.createElement('div');
-        toast.className = `toast toast-${type}`;
-        toast.textContent = message;
+        toast.className = `toast`;
+
+        // Set background color based on type
+        let bgColor = 'var(--color-primary)';
+        let icon = 'ℹ️';
+        if (type === 'success') {
+            bgColor = 'var(--color-success)';
+            icon = '✅';
+        } else if (type === 'danger' || type === 'error') {
+            bgColor = 'var(--color-danger)';
+            icon = '❌';
+        } else if (type === 'warning') {
+            bgColor = 'var(--color-warning)';
+            icon = '⚠️';
+        }
+
+        toast.innerHTML = `
+            <div style="display: flex; align-items: center; gap: var(--space-2);">
+                <span>${icon}</span>
+                <span>${message}</span>
+            </div>
+        `;
         toast.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 1rem 1.5rem;
-            background-color: var(--accent-warm);
+            min-width: 300px;
+            padding: var(--space-4);
+            background-color: ${bgColor};
             color: white;
-            border-radius: var(--radius-md);
+            border-radius: var(--radius-lg);
             box-shadow: var(--shadow-lg);
-            z-index: 9999;
             animation: slideIn 0.3s ease;
+            margin-bottom: var(--space-3);
         `;
 
-        document.body.appendChild(toast);
+        toastContainer.appendChild(toast);
 
         setTimeout(() => {
             toast.style.animation = 'slideOut 0.3s ease';

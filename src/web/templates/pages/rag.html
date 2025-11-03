@@ -1,0 +1,182 @@
+{% extends "base_new.html" %}
+
+{% block title %}Document Q&A - AI Search Engine{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div style="margin-bottom: var(--space-8);">
+  <h1 style="font-size: var(--text-3xl); font-weight: 700; margin-bottom: var(--space-2); color: var(--text-primary);">
+    📚 Document Q&A
+  </h1>
+  <p style="color: var(--text-secondary); font-size: var(--text-lg);">
+    Upload documents and ask questions powered by Retrieval-Augmented Generation (RAG)
+  </p>
+</div>
+
+<!-- Statistics Cards -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-4); margin-bottom: var(--space-8);">
+  <div class="card">
+    <div class="card-body" style="text-align: center;">
+      <div style="font-size: var(--text-3xl); font-weight: 700; color: var(--color-primary);">
+        {{ stats.total_documents }}
+      </div>
+      <div style="font-size: var(--text-sm); color: var(--text-secondary); margin-top: var(--space-2);">
+        Documents
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body" style="text-align: center;">
+      <div style="font-size: var(--text-3xl); font-weight: 700; color: var(--color-success);">
+        {{ stats.total_chunks }}
+      </div>
+      <div style="font-size: var(--text-sm); color: var(--text-secondary); margin-top: var(--space-2);">
+        Text Chunks
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body" style="text-align: center;">
+      <div style="font-size: var(--text-3xl); font-weight: 700; color: var(--color-warning);">
+        {{ stats.total_size_mb }}MB
+      </div>
+      <div style="font-size: var(--text-sm); color: var(--text-secondary); margin-top: var(--space-2);">
+        Total Size
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Main Content Grid -->
+<div style="display: grid; grid-template-columns: 1fr 2fr; gap: var(--space-6);">
+
+  <!-- Left Column: Upload & Documents -->
+  <div>
+    <!-- Upload Card -->
+    <div class="card" style="margin-bottom: var(--space-6);">
+      <div class="card-header">
+        <h2 class="card-title">Upload Document</h2>
+        <p class="card-subtitle">Supported: PDF, TXT, MD, DOCX</p>
+      </div>
+      <div class="card-body">
+        <form
+          hx-post="/rag/upload"
+          hx-target="#uploadResult"
+          hx-indicator="#uploadLoading"
+          enctype="multipart/form-data"
+        >
+          <div class="form-group">
+            <label class="form-label">Select File</label>
+            <input
+              type="file"
+              name="file"
+              accept=".pdf,.txt,.md,.docx,.doc"
+              class="form-input"
+              required
+            />
+          </div>
+
+          <button type="submit" class="btn btn-primary" style="width: 100%;">
+            📤 Upload Document
+          </button>
+
+          <div id="uploadLoading" class="loading-container htmx-indicator" style="margin-top: var(--space-4);">
+            <div class="spinner"></div>
+            <div class="loading-text">Uploading and processing...</div>
+          </div>
+        </form>
+
+        <div id="uploadResult" style="margin-top: var(--space-4);"></div>
+      </div>
+    </div>
+
+    <!-- Document List Card -->
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Your Documents</h2>
+        <button
+          hx-get="/rag/documents"
+          hx-target="#documentList"
+          class="btn btn-ghost btn-sm"
+        >
+          🔄 Refresh
+        </button>
+      </div>
+      <div class="card-body">
+        <div
+          id="documentList"
+          hx-get="/rag/documents"
+          hx-trigger="load, every 5s"
+        >
+          <!-- Document list will be loaded here -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Column: Query Interface -->
+  <div>
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Ask Questions</h2>
+        <p class="card-subtitle">Query your documents with natural language</p>
+      </div>
+      <div class="card-body">
+        <form
+          hx-post="/rag/query"
+          hx-target="#ragResults"
+          hx-indicator="#queryLoading"
+        >
+          <div class="form-group">
+            <label class="form-label">Your Question</label>
+            <textarea
+              name="query"
+              class="form-input"
+              rows="3"
+              placeholder="e.g., What are the main findings in the research paper?"
+              required
+            ></textarea>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Number of sources to retrieve</label>
+            <select name="top_k" class="form-input">
+              <option value="3">3 sources</option>
+              <option value="5" selected>5 sources</option>
+              <option value="10">10 sources</option>
+            </select>
+          </div>
+
+          <button type="submit" class="btn btn-primary" style="width: 100%;">
+            🔍 Ask Question
+          </button>
+
+          <div id="queryLoading" class="loading-container htmx-indicator" style="margin-top: var(--space-4);">
+            <div class="spinner"></div>
+            <div class="loading-text">Searching documents and generating answer...</div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Results Container -->
+    <div id="ragResults" style="margin-top: var(--space-6);"></div>
+  </div>
+</div>
+
+<script>
+// Auto-refresh document list after successful upload
+document.body.addEventListener('htmx:afterSwap', function(event) {
+  if (event.detail.target.id === 'uploadResult') {
+    // Trigger document list refresh
+    htmx.trigger('#documentList', 'refresh');
+
+    // Clear the form
+    event.detail.target.closest('form')?.reset();
+  }
+});
+</script>
+
+{% endblock %}

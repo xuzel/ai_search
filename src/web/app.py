@@ -10,7 +10,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.web import database
-from src.web.routers import main, search, code, chat, history
+from src.web.routers import main, search, code, chat, history, query, rag, multimodal, tools, workflow
 from src.utils import get_logger
 
 logger = get_logger(__name__)
@@ -50,9 +50,17 @@ app.add_middleware(
 BASE_DIR = Path(__file__).parent
 STATIC_DIR = BASE_DIR / "static"
 TEMPLATES_DIR = BASE_DIR / "templates"
+UPLOADS_DIR = BASE_DIR / "uploads"
+
+# Create uploads directory if it doesn't exist
+UPLOADS_DIR.mkdir(exist_ok=True)
+(UPLOADS_DIR / "rag_documents").mkdir(exist_ok=True)
+(UPLOADS_DIR / "images").mkdir(exist_ok=True)
+(UPLOADS_DIR / "temp").mkdir(exist_ok=True)
 
 # Mount static files
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 
 # Setup templates
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -62,6 +70,11 @@ app.state.templates = templates
 
 # Include routers
 app.include_router(main.router, tags=["main"])
+app.include_router(query.router, tags=["query"])  # Unified query router with intelligent routing
+app.include_router(rag.router, tags=["rag"])  # RAG document Q&A
+app.include_router(multimodal.router, tags=["multimodal"])  # Multimodal - OCR & Vision
+app.include_router(tools.router, tags=["tools"])  # Domain Tools - Weather, Finance, Routing
+app.include_router(workflow.router, tags=["workflow"])  # Workflow - Multi-step task orchestration
 app.include_router(search.router, prefix="/search", tags=["search"])
 app.include_router(code.router, prefix="/code", tags=["code"])
 app.include_router(chat.router, prefix="/chat", tags=["chat"])

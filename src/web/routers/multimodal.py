@@ -1,0 +1,395 @@
+"""Multimodal Router - OCR and Vision Analysis"""
+
+import asyncio
+import logging
+from typing import Optional
+from pathlib import Path
+import json
+
+from fastapi import APIRouter, Request, UploadFile, File, HTTPException
+from fastapi.responses import HTMLResponse, JSONResponse
+import markdown
+from markdown.extensions.codehilite import CodeHiliteExtension
+from markdown.extensions.fenced_code import FencedCodeExtension
+from markdown.extensions.tables import TableExtension
+
+from src.utils import get_config
+from src.llm import LLMManager
+from src.tools import OCRTool, VisionTool
+from src.web import database
+from src.web.upload_manager import UploadManager
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter()
+
+# Global instances
+config = None
+llm_manager = None
+ocr_tool = None
+vision_tool = None
+upload_manager = None
+
+
+async def initialize_multimodal():
+    """Initialize multimodal tools"""
+    global config, llm_manager, ocr_tool, vision_tool, upload_manager
+
+    if ocr_tool is None or vision_tool is None:
+        try:
+            config = get_config()
+            llm_manager = LLMManager(config=config)
+
+            # Initialize OCR Tool
+            if config.multimodal.ocr.enabled:
+                try:
+                    ocr_tool = OCRTool()
+                    logger.info("OCRTool initialized successfully")
+                except Exception as e:
+                    logger.warning(f"OCRTool initialization failed (optional): {e}")
+                    ocr_tool = None
+            else:
+                logger.info("OCRTool disabled in config")
+                ocr_tool = None
+
+            # Initialize Vision Tool
+            if config.multimodal.vision.enabled:
+                try:
+                    vision_tool = VisionTool(llm_manager=llm_manager)
+                    logger.info("VisionTool initialized successfully")
+                except Exception as e:
+                    logger.warning(f"VisionTool initialization failed (optional): {e}")
+                    vision_tool = None
+            else:
+                logger.info("VisionTool disabled in config")
+                vision_tool = None
+
+            upload_manager = UploadManager()
+
+            if ocr_tool is None and vision_tool is None:
+                logger.error("No multimodal tools available")
+                raise RuntimeError("No multimodal tools could be initialized")
+
+        except Exception as e:
+            logger.error(f"Error initializing multimodal tools: {e}")
+            raise
+
+
+@router.get("/multimodal", response_class=HTMLResponse)
+async def multimodal_page(request: Request):
+    """Render multimodal (OCR & Vision) page"""
+    templates = request.app.state.templates
+
+    # Initialize multimodal tools to check availability
+    try:
+        await initialize_multimodal()
+    except Exception as e:
+        logger.warning(f"Failed to initialize multimodal tools: {e}")
+
+    return templates.TemplateResponse(
+        "pages/multimodal.html",
+        {
+            "request": request,
+            "breadcrumb_section": "Image & OCR",
+            "ocr_available": ocr_tool is not None,
+            "vision_available": vision_tool is not None,
+        },
+    )
+
+
+@router.post("/multimodal/ocr", response_class=HTMLResponse)
+async def extract_text_ocr(
+    request: Request,
+    file: UploadFile = File(...),
+    language: str = "ch",  # Chinese by default
+):
+    """
+    Extract text from image using OCR
+
+    Args:
+        file: Image file (PNG, JPG, etc.)
+        language: OCR language (ch=Chinese, en=English, etc.)
+    """
+    await initialize_multimodal()
+
+    if ocr_tool is None:
+        raise HTTPException(status_code=503, detail="OCR tool not available")
+
+    templates = request.app.state.templates
+
+    try:
+        # Validate file
+        allowed_types = ["png", "jpg", "jpeg", "bmp", "gif", "webp"]
+        await upload_manager.validate_file(
+            file,
+            allowed_types=allowed_types,
+            max_size=20 * 1024 * 1024,  # 20MB for images
+        )
+
+        # Save file
+        file_info = await upload_manager.save_document(
+            file, upload_type="images"
+        )
+        filepath = file_info["filepath"]
+
+        logger.info(f"Processing OCR for image: {file_info['filename']}")
+
+        # Extract text using OCR
+        ocr_result = await ocr_tool.extract_text(
+            image_path=filepath, language=language
+        )
+
+        # Format result
+        result = {
+            "text": ocr_result.get("full_text", ""),
+            "confidence": ocr_result.get("average_confidence", 0.0),
+            "language": language,
+            "raw_lines": ocr_result.get("lines", []),
+        }
+
+        # Convert analysis to markdown
+        md = markdown.Markdown(
+            extensions=[
+                FencedCodeExtension(),
+                CodeHiliteExtension(),
+                TableExtension(),
+                "nl2br",
+            ]
+        )
+
+        # Create formatted markdown output
+        markdown_output = f"""# OCR结果 (OCR Result)
+
+## 识别的文本 (Recognized Text)
+
+```
+{result['text']}
+```
+
+## 统计信息 (Statistics)
+
+- **语言**: {language}
+- **识别置信度**: {result['confidence']:.2%}
+- **文本行数**: {len(result['raw_lines'])}
+
+## 详细结果 (Detailed Results)
+
+| 行号 | 文本 | 置信度 |
+|------|------|--------|
+"""
+
+        for i, line in enumerate(result["raw_lines"][:20], 1):  # Show first 20 lines
+            text = line.get("text", "").replace("|", "\\|")
+            confidence = line.get("confidence", 0.0)
+            markdown_output += f"| {i} | {text} | {confidence:.2%} |\n"
+
+        if len(result["raw_lines"]) > 20:
+            markdown_output += (
+                f"\n*... 还有 {len(result['raw_lines']) - 20} 行 *\n"
+            )
+
+        # Render markdown to HTML
+        result["markdown"] = md.convert(markdown_output)
+
+        # Save to conversation history
+        await database.save_conversation(
+            mode="ocr",
+            query=f"OCR: {file_info['filename']}",
+            response=result["text"],
+            metadata=json.dumps(
+                {
+                    "filename": file_info["filename"],
+                    "confidence": result["confidence"],
+                    "language": language,
+                    "lines": len(result["raw_lines"]),
+                }
+            ),
+        )
+
+        return templates.TemplateResponse(
+            "components/result_ocr.html",
+            {
+                "request": request,
+                "query": f"OCR: {file_info['filename']}",
+                "result": result,
+                "filename": file_info["filename"],
+            },
+        )
+
+    except ValueError as e:
+        logger.error(f"OCR validation error: {e}")
+        return templates.TemplateResponse(
+            "components/error.html",
+            {"request": request, "error_message": str(e)},
+        )
+    except Exception as e:
+        logger.error(f"Error in OCR processing: {e}", exc_info=True)
+        return templates.TemplateResponse(
+            "components/error.html",
+            {"request": request, "error_message": f"OCR failed: {str(e)}"},
+        )
+
+
+@router.post("/multimodal/vision", response_class=HTMLResponse)
+async def analyze_image_vision(
+    request: Request,
+    file: UploadFile = File(...),
+    query: Optional[str] = None,
+):
+    """
+    Analyze image using Vision (Gemini)
+
+    Args:
+        file: Image file (PNG, JPG, etc.)
+        query: Optional specific question about the image
+    """
+    await initialize_multimodal()
+
+    if vision_tool is None:
+        raise HTTPException(status_code=503, detail="Vision tool not available")
+
+    templates = request.app.state.templates
+
+    try:
+        # Validate file
+        allowed_types = ["png", "jpg", "jpeg", "bmp", "gif", "webp"]
+        await upload_manager.validate_file(
+            file,
+            allowed_types=allowed_types,
+            max_size=20 * 1024 * 1024,  # 20MB for images
+        )
+
+        # Save file
+        file_info = await upload_manager.save_document(
+            file, upload_type="images"
+        )
+        filepath = file_info["filepath"]
+
+        logger.info(f"Analyzing image with Vision: {file_info['filename']}")
+
+        # Analyze image
+        vision_result = await vision_tool.analyze_image(
+            image_path=filepath, query=query
+        )
+
+        # Format result
+        result = {
+            "analysis": vision_result.get("analysis", ""),
+            "objects": vision_result.get("objects", []),
+            "text": vision_result.get("text", ""),
+            "tags": vision_result.get("tags", []),
+            "query": query or "General image analysis",
+        }
+
+        # Convert analysis to markdown
+        md = markdown.Markdown(
+            extensions=[
+                FencedCodeExtension(),
+                CodeHiliteExtension(),
+                TableExtension(),
+                "nl2br",
+            ]
+        )
+
+        # Create formatted markdown output
+        markdown_output = f"""# 图像分析结果 (Image Analysis)
+
+## 分析内容 (Analysis)
+
+{result['analysis']}
+
+"""
+
+        if result["text"]:
+            markdown_output += f"""## 检测到的文本 (Detected Text)
+
+```
+{result['text']}
+```
+
+"""
+
+        if result["objects"]:
+            markdown_output += f"""## 识别的对象 (Detected Objects)
+
+{', '.join(result['objects'])}
+
+"""
+
+        if result["tags"]:
+            markdown_output += f"""## 标签 (Tags)
+
+{', '.join(f'`{tag}`' for tag in result['tags'])}
+
+"""
+
+        # Render markdown to HTML
+        result["markdown"] = md.convert(markdown_output)
+
+        # Save to conversation history
+        await database.save_conversation(
+            mode="vision",
+            query=f"Vision: {file_info['filename']} - {query or 'General'}",
+            response=result["analysis"],
+            metadata=json.dumps(
+                {
+                    "filename": file_info["filename"],
+                    "has_text": bool(result["text"]),
+                    "objects_count": len(result["objects"]),
+                    "tags_count": len(result["tags"]),
+                }
+            ),
+        )
+
+        return templates.TemplateResponse(
+            "components/result_vision.html",
+            {
+                "request": request,
+                "query": query or "General image analysis",
+                "result": result,
+                "filename": file_info["filename"],
+            },
+        )
+
+    except ValueError as e:
+        logger.error(f"Vision validation error: {e}")
+        return templates.TemplateResponse(
+            "components/error.html",
+            {"request": request, "error_message": str(e)},
+        )
+    except Exception as e:
+        logger.error(f"Error in Vision processing: {e}", exc_info=True)
+        return templates.TemplateResponse(
+            "components/error.html",
+            {
+                "request": request,
+                "error_message": f"Vision analysis failed: {str(e)}",
+            },
+        )
+
+
+@router.get("/multimodal/status")
+async def get_status():
+    """Get multimodal tools status"""
+    try:
+        await initialize_multimodal()
+
+        return JSONResponse(
+            content={
+                "ocr_available": ocr_tool is not None,
+                "vision_available": vision_tool is not None,
+                "message": "Multimodal tools ready"
+                if (ocr_tool or vision_tool)
+                else "No multimodal tools available",
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error getting status: {e}")
+        return JSONResponse(
+            content={
+                "ocr_available": False,
+                "vision_available": False,
+                "message": f"Error: {str(e)}",
+            },
+            status_code=503,
+        )

@@ -1,0 +1,80 @@
+<!-- Document List -->
+{% if documents %}
+<div style="display: flex; flex-direction: column; gap: var(--space-2);">
+  {% for doc in documents %}
+  <div style="padding: var(--space-3); background-color: var(--bg-secondary); border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+    <div style="display: flex; align-items: start; justify-content: space-between; gap: var(--space-2);">
+      <div style="flex: 1; min-width: 0;">
+        <!-- Filename -->
+        <div style="font-weight: 500; font-size: var(--text-sm); color: var(--text-primary); margin-bottom: var(--space-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+          📄 {{ doc.filename }}
+        </div>
+
+        <!-- Metadata -->
+        <div style="display: flex; flex-wrap: wrap; gap: var(--space-2); font-size: var(--text-xs); color: var(--text-tertiary);">
+          <span>{{ (doc.file_size / 1024) | round(1) }} KB</span>
+
+          {% if doc.num_chunks > 0 %}
+          <span>•</span>
+          <span>{{ doc.num_chunks }} chunks</span>
+          {% endif %}
+
+          <!-- Status Badge -->
+          <span>•</span>
+          {% if doc.processing_status == 'completed' %}
+          <span class="badge badge-success badge-sm">✓ Ready</span>
+          {% elif doc.processing_status == 'processing' %}
+          <span class="badge badge-warning badge-sm">⏳ Processing</span>
+          {% elif doc.processing_status == 'failed' %}
+          <span class="badge badge-danger badge-sm">✗ Failed</span>
+          {% else %}
+          <span class="badge badge-secondary badge-sm">⏸ Pending</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div style="display: flex; gap: var(--space-1);">
+        {% if doc.processing_status == 'failed' %}
+        <button
+          hx-post="/rag/reprocess/{{ doc.id }}"
+          hx-target="#documentList"
+          class="btn btn-ghost btn-sm"
+          title="Reprocess"
+        >
+          🔄
+        </button>
+        {% endif %}
+
+        <button
+          hx-delete="/rag/documents/{{ doc.id }}"
+          hx-confirm="Are you sure you want to delete this document?"
+          hx-target="#documentList"
+          class="btn btn-ghost btn-sm"
+          title="Delete"
+        >
+          🗑️
+        </button>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Pagination info -->
+<div style="margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--border-color); font-size: var(--text-xs); color: var(--text-tertiary); text-align: center;">
+  Showing {{ documents|length }} document(s)
+  {% if stats %}
+  • Total: {{ stats.total_documents }}
+  {% endif %}
+</div>
+
+{% else %}
+<div style="text-align: center; padding: var(--space-8); color: var(--text-secondary);">
+  <div style="font-size: var(--text-4xl); margin-bottom: var(--space-3);">📁</div>
+  <div style="font-size: var(--text-sm);">No documents uploaded yet</div>
+  <div style="font-size: var(--text-xs); margin-top: var(--space-2);">
+    Upload your first document to get started
+  </div>
+</div>
+{% endif %}

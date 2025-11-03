@@ -1,0 +1,356 @@
+<!-- Workflow Plan Template -->
+
+<div class="workflow-plan-container">
+    <div class="plan-header">
+        <h2>Workflow Plan</h2>
+        <p class="plan-subtitle">Your query will be executed as the following workflow</p>
+    </div>
+
+    {% if plan.goal %}
+    <div class="plan-goal-section">
+        <h3>Goal</h3>
+        <p class="goal-text">{{ plan.goal }}</p>
+    </div>
+    {% endif %}
+
+    <div class="plan-info-grid">
+        <div class="info-card">
+            <div class="info-label">Complexity</div>
+            <div class="info-value">{{ plan.complexity }}</div>
+        </div>
+        <div class="info-card">
+            <div class="info-label">Estimated Steps</div>
+            <div class="info-value">{{ plan.estimated_steps }}</div>
+        </div>
+        <div class="info-card">
+            <div class="info-label">Subtasks</div>
+            <div class="info-value">{{ plan.subtasks|length }}</div>
+        </div>
+    </div>
+
+    <div class="tasks-section">
+        <h3>Task Breakdown</h3>
+        <div class="tasks-list">
+            {% for subtask in plan.subtasks %}
+            <div class="task-item" data-task-id="{{ subtask.id }}">
+                <div class="task-number">{{ loop.index }}</div>
+                <div class="task-content">
+                    <div class="task-header">
+                        <span class="task-tool-badge" data-tool="{{ subtask.tool }}">
+                            {% if subtask.tool == 'search' %}
+                                🔍 Search
+                            {% elif subtask.tool == 'code' %}
+                                💻 Code
+                            {% elif subtask.tool == 'chat' %}
+                                💬 Chat
+                            {% elif subtask.tool == 'weather' %}
+                                🌤️ Weather
+                            {% elif subtask.tool == 'finance' %}
+                                📈 Finance
+                            {% elif subtask.tool == 'routing' %}
+                                🗺️ Routing
+                            {% else %}
+                                ⚙️ {{ subtask.tool }}
+                            {% endif %}
+                        </span>
+                        <h4>{{ subtask.description }}</h4>
+                    </div>
+
+                    <div class="task-details">
+                        <p><strong>Query:</strong> {{ subtask.query }}</p>
+                        {% if subtask.dependencies %}
+                        <p class="task-dependencies">
+                            <strong>Depends on:</strong>
+                            {% for dep in subtask.dependencies %}
+                                <span class="dep-tag">Task {{ loop.index }}</span>
+                                {%- if not loop.last %},{% endif %}
+                            {% endfor %}
+                        </p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="plan-actions">
+        <button class="btn btn-primary" hx-post="/workflow/execute" hx-include="[name='query']">
+            Execute Workflow
+        </button>
+        <button class="btn btn-secondary" onclick="history.back()">
+            Cancel
+        </button>
+    </div>
+</div>
+
+<style>
+.workflow-plan-container {
+    width: 100%;
+    max-width: 1000px;
+    margin: 20px auto;
+    padding: 20px;
+}
+
+.plan-header {
+    text-align: center;
+    margin-bottom: 30px;
+    border-bottom: 2px solid var(--accent-warm, #d4a574);
+    padding-bottom: 20px;
+}
+
+.plan-header h2 {
+    margin: 0 0 10px 0;
+    color: var(--text-primary, #333);
+}
+
+.plan-subtitle {
+    margin: 0;
+    color: var(--text-secondary, #666);
+    font-size: 14px;
+}
+
+.plan-goal-section {
+    background: var(--bg-secondary, #f5f3f0);
+    border-left: 4px solid var(--accent-warm, #d4a574);
+    padding: 15px 20px;
+    margin-bottom: 20px;
+    border-radius: 4px;
+}
+
+.plan-goal-section h3 {
+    margin: 0 0 10px 0;
+    color: var(--text-primary, #333);
+    font-size: 16px;
+}
+
+.goal-text {
+    margin: 0;
+    color: var(--text-secondary, #666);
+    line-height: 1.6;
+}
+
+.plan-info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+    margin-bottom: 30px;
+}
+
+.info-card {
+    background: var(--bg-primary, #fff);
+    border: 1px solid var(--border-color, #e0e0e0);
+    border-radius: 6px;
+    padding: 20px;
+    text-align: center;
+}
+
+.info-label {
+    color: var(--text-secondary, #666);
+    font-size: 12px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+}
+
+.info-value {
+    color: var(--accent-warm, #d4a574);
+    font-size: 24px;
+    font-weight: bold;
+}
+
+.tasks-section {
+    margin-bottom: 30px;
+}
+
+.tasks-section h3 {
+    margin-bottom: 20px;
+    color: var(--text-primary, #333);
+    font-size: 18px;
+}
+
+.tasks-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.task-item {
+    display: flex;
+    gap: 15px;
+    padding: 15px;
+    background: var(--bg-secondary, #f5f3f0);
+    border-radius: 6px;
+    border-left: 4px solid var(--accent-warm, #d4a574);
+    transition: all 0.3s ease;
+}
+
+.task-item:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transform: translateX(5px);
+}
+
+.task-number {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    background: var(--accent-warm, #d4a574);
+    color: white;
+    border-radius: 50%;
+    font-weight: bold;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.task-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.task-header {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.task-tool-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.task-tool-badge[data-tool="search"] {
+    background: #e3f2fd;
+    color: #1976d2;
+}
+
+.task-tool-badge[data-tool="code"] {
+    background: #f3e5f5;
+    color: #7b1fa2;
+}
+
+.task-tool-badge[data-tool="chat"] {
+    background: #e8f5e9;
+    color: #388e3c;
+}
+
+.task-tool-badge[data-tool="weather"] {
+    background: #fff3e0;
+    color: #e65100;
+}
+
+.task-tool-badge[data-tool="finance"] {
+    background: #fce4ec;
+    color: #c2185b;
+}
+
+.task-tool-badge[data-tool="routing"] {
+    background: #e0f2f1;
+    color: #00796b;
+}
+
+.task-header h4 {
+    margin: 0;
+    color: var(--text-primary, #333);
+    font-size: 14px;
+    flex: 1;
+}
+
+.task-details {
+    font-size: 13px;
+    color: var(--text-secondary, #666);
+    line-height: 1.6;
+}
+
+.task-details p {
+    margin: 5px 0;
+}
+
+.task-dependencies {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.dep-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    background: var(--accent-light, #e8d4c0);
+    border-radius: 3px;
+    font-size: 12px;
+}
+
+.plan-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    padding-top: 20px;
+    border-top: 1px solid var(--border-color, #e0e0e0);
+}
+
+.btn {
+    padding: 12px 30px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.btn-primary {
+    background: var(--accent-warm, #d4a574);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: var(--accent-dark, #b8925a);
+    transform: translateY(-2px);
+}
+
+.btn-secondary {
+    background: var(--border-color, #e0e0e0);
+    color: var(--text-primary, #333);
+}
+
+.btn-secondary:hover {
+    background: var(--accent-light, #e8d4c0);
+}
+
+@media (max-width: 768px) {
+    .plan-info-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .task-item {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .task-number {
+        width: 35px;
+        height: 35px;
+        font-size: 14px;
+        align-self: flex-start;
+    }
+
+    .task-header {
+        flex-wrap: wrap;
+    }
+
+    .plan-actions {
+        flex-direction: column;
+    }
+
+    .btn {
+        width: 100%;
+    }
+}
+</style>

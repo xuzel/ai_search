@@ -1,0 +1,64 @@
+<!-- Workflow Plan Loader - Dynamically loads the plan via HTMX -->
+
+<div id="workflowPlanContainer">
+    <div class="plan-loading">
+        <div class="spinner"></div>
+        <p>Creating workflow plan for your query...</p>
+    </div>
+</div>
+
+<script>
+// Load the workflow plan
+function loadWorkflowPlan() {
+    const query = "{{ query }}";
+    const container = document.getElementById('workflowPlanContainer');
+
+    // Make request to /workflow/plan
+    fetch('/workflow/plan', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'query=' + encodeURIComponent(query)
+    })
+    .then(response => response.text())
+    .then(html => {
+        container.innerHTML = html;
+    })
+    .catch(error => {
+        console.error('Error loading workflow plan:', error);
+        container.innerHTML = '<div class="alert alert-danger">Error loading workflow plan</div>';
+    });
+}
+
+// Load plan when page loads
+document.addEventListener('DOMContentLoaded', loadWorkflowPlan);
+</script>
+
+<style>
+#workflowPlanContainer {
+    width: 100%;
+    max-width: 1000px;
+    margin: 20px auto;
+}
+
+.plan-loading {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-secondary, #666);
+}
+
+.spinner {
+    width: 50px;
+    height: 50px;
+    margin: 0 auto 20px;
+    border: 5px solid var(--bg-secondary, #f5f3f0);
+    border-top-color: var(--accent-warm, #d4a574);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+</style>

@@ -1,0 +1,48 @@
+<!-- Chat Result Component -->
+<div class="result-card">
+  <!-- Header -->
+  <div class="result-header">
+    <div>
+      <h2 class="result-title">💬 Chat Response</h2>
+      <div class="result-meta">
+        <span class="badge badge-secondary">{{ task_type | default('chat') }}</span>
+        {% if confidence %}
+        <span style="color: var(--text-secondary);">Confidence: {{ (confidence * 100) | int }}%</span>
+        {% endif %}
+      </div>
+    </div>
+    <div>
+      <button class="btn btn-secondary btn-sm" onclick="window.location.href='/'">
+        New Question
+      </button>
+    </div>
+  </div>
+
+  <!-- Query Display -->
+  <div style="padding: var(--space-4); background-color: var(--bg-tertiary); border-radius: var(--radius-md); margin-bottom: var(--space-6);">
+    <div style="font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-2);">
+      Your Question:
+    </div>
+    <div style="font-weight: 500;">{{ query }}</div>
+  </div>
+
+  <!-- Response -->
+  <div class="result-content">
+    <div style="padding: var(--space-5); background-color: var(--bg-secondary); border-radius: var(--radius-lg); line-height: 1.7;">
+      {{ result.message | default(result.answer) | safe }}
+    </div>
+  </div>
+
+  <!-- Actions -->
+  <div style="margin-top: var(--space-8); display: flex; gap: var(--space-3); flex-wrap: wrap;">
+    <button class="btn btn-primary" onclick="window.location.href='/'">
+      ← Ask Another Question
+    </button>
+    <button class="btn btn-outline" onclick="window.location.href='/chat'">
+      💬 Go to Chat Mode
+    </button>
+    <button class="btn btn-outline" onclick="window.location.href='/history'">
+      📜 View History
+    </button>
+  </div>
+</div>

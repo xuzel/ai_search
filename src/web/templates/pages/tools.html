@@ -1,0 +1,313 @@
+{% extends "base_new.html" %}
+
+{% block title %}Domain Tools - AI Search Engine{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div style="margin-bottom: var(--space-8);">
+  <h1 style="font-size: var(--text-3xl); font-weight: 700; margin-bottom: var(--space-2); color: var(--text-primary);">
+    🛠️ Domain Tools
+  </h1>
+  <p style="color: var(--text-secondary); font-size: var(--text-lg);">
+    Access specialized tools for weather, stock market, and route planning
+  </p>
+</div>
+
+<!-- Status Information -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-4); margin-bottom: var(--space-8);">
+  {% if weather_available %}
+  <div class="card" style="border-left: 4px solid var(--color-success);">
+    <div class="card-body">
+      <div style="display: flex; align-items: center; gap: var(--space-2);">
+        <span style="font-size: 24px;">✅</span>
+        <div>
+          <div style="font-weight: 600; color: var(--text-primary);">Weather Ready</div>
+          <div style="font-size: var(--text-sm); color: var(--text-secondary);">Weather queries enabled</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="card" style="border-left: 4px solid var(--color-warning);">
+    <div class="card-body">
+      <div style="display: flex; align-items: center; gap: var(--space-2);">
+        <span style="font-size: 24px;">⚠️</span>
+        <div>
+          <div style="font-weight: 600; color: var(--text-primary);">Weather Unavailable</div>
+          <div style="font-size: var(--text-sm); color: var(--text-secondary);">API not configured</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if finance_available %}
+  <div class="card" style="border-left: 4px solid var(--color-success);">
+    <div class="card-body">
+      <div style="display: flex; align-items: center; gap: var(--space-2);">
+        <span style="font-size: 24px;">✅</span>
+        <div>
+          <div style="font-weight: 600; color: var(--text-primary);">Finance Ready</div>
+          <div style="font-size: var(--text-sm); color: var(--text-secondary);">Stock data available</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="card" style="border-left: 4px solid var(--color-warning);">
+    <div class="card-body">
+      <div style="display: flex; align-items: center; gap: var(--space-2);">
+        <span style="font-size: 24px;">⚠️</span>
+        <div>
+          <div style="font-weight: 600; color: var(--text-primary);">Finance Unavailable</div>
+          <div style="font-size: var(--text-sm); color: var(--text-secondary);">API not configured</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if routing_available %}
+  <div class="card" style="border-left: 4px solid var(--color-success);">
+    <div class="card-body">
+      <div style="display: flex; align-items: center; gap: var(--space-2);">
+        <span style="font-size: 24px;">✅</span>
+        <div>
+          <div style="font-weight: 600; color: var(--text-primary);">Routing Ready</div>
+          <div style="font-size: var(--text-sm); color: var(--text-secondary);">Route planning enabled</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="card" style="border-left: 4px solid var(--color-warning);">
+    <div class="card-body">
+      <div style="display: flex; align-items: center; gap: var(--space-2);">
+        <span style="font-size: 24px;">⚠️</span>
+        <div>
+          <div style="font-weight: 600; color: var(--text-primary);">Routing Unavailable</div>
+          <div style="font-size: var(--text-sm); color: var(--text-secondary);">API not configured</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Tools Grid -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--space-6);">
+
+  <!-- Weather Tool -->
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">🌡️ Weather</h2>
+      <p class="card-subtitle">Get current weather and forecasts</p>
+    </div>
+    <div class="card-body">
+      {% if weather_available %}
+      <form
+        hx-post="/tools/weather"
+        hx-target="#weatherResult"
+        hx-indicator="#weatherLoading"
+      >
+        <div class="form-group">
+          <label class="form-label">Location</label>
+          <input
+            type="text"
+            name="location"
+            class="form-input"
+            placeholder="e.g., London, New York, Tokyo"
+            required
+          />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">
+            <input type="checkbox" name="include_forecast" value="true" />
+            Include 7-Day Forecast
+          </label>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%;">
+          🔍 Get Weather
+        </button>
+
+        <div id="weatherLoading" class="loading-container htmx-indicator" style="margin-top: var(--space-4);">
+          <div class="spinner"></div>
+          <div class="loading-text">Fetching weather data...</div>
+        </div>
+      </form>
+
+      <div id="weatherResult" style="margin-top: var(--space-4);"></div>
+      {% else %}
+      <div style="padding: var(--space-4); background-color: var(--bg-secondary); border-radius: var(--radius-md); color: var(--text-secondary);">
+        <p style="margin: 0;">⚠️ Weather tool is not available. Please configure OpenWeatherMap API to use this feature.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Finance Tool -->
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">📈 Stock Market</h2>
+      <p class="card-subtitle">Check stock prices and data</p>
+    </div>
+    <div class="card-body">
+      {% if finance_available %}
+      <form
+        hx-post="/tools/finance"
+        hx-target="#financeResult"
+        hx-indicator="#financeLoading"
+      >
+        <div class="form-group">
+          <label class="form-label">Stock Symbol</label>
+          <input
+            type="text"
+            name="symbol"
+            class="form-input"
+            placeholder="e.g., AAPL, GOOGL, MSFT"
+            required
+            style="text-transform: uppercase;"
+          />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Time Period</label>
+          <select name="period" class="form-input">
+            <option value="1d">1 Day</option>
+            <option value="5d">5 Days</option>
+            <option value="1mo">1 Month</option>
+            <option value="3mo">3 Months</option>
+            <option value="6mo">6 Months</option>
+            <option value="1y" selected>1 Year</option>
+            <option value="2y">2 Years</option>
+            <option value="5y">5 Years</option>
+          </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%;">
+          📊 Get Stock Data
+        </button>
+
+        <div id="financeLoading" class="loading-container htmx-indicator" style="margin-top: var(--space-4);">
+          <div class="spinner"></div>
+          <div class="loading-text">Fetching stock data...</div>
+        </div>
+      </form>
+
+      <div id="financeResult" style="margin-top: var(--space-4);"></div>
+      {% else %}
+      <div style="padding: var(--space-4); background-color: var(--bg-secondary); border-radius: var(--radius-md); color: var(--text-secondary);">
+        <p style="margin: 0;">⚠️ Finance tool is not available. Please configure stock market API to use this feature.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Routing Tool -->
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">🗺️ Route Planner</h2>
+      <p class="card-subtitle">Plan routes between locations</p>
+    </div>
+    <div class="card-body">
+      {% if routing_available %}
+      <form
+        hx-post="/tools/routing"
+        hx-target="#routingResult"
+        hx-indicator="#routingLoading"
+      >
+        <div class="form-group">
+          <label class="form-label">Starting Point</label>
+          <input
+            type="text"
+            name="origin"
+            class="form-input"
+            placeholder="e.g., 1 Apple Park, Cupertino"
+            required
+          />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Destination</label>
+          <input
+            type="text"
+            name="destination"
+            class="form-input"
+            placeholder="e.g., Golden Gate Bridge, San Francisco"
+            required
+          />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Travel Mode</label>
+          <select name="mode" class="form-input">
+            <option value="driving" selected>🚗 Driving</option>
+            <option value="walking">🚶 Walking</option>
+            <option value="cycling">🚴 Cycling</option>
+            <option value="foot-walking">🥾 Foot Walking</option>
+          </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%;">
+          🧭 Get Route
+        </button>
+
+        <div id="routingLoading" class="loading-container htmx-indicator" style="margin-top: var(--space-4);">
+          <div class="spinner"></div>
+          <div class="loading-text">Planning route...</div>
+        </div>
+      </form>
+
+      <div id="routingResult" style="margin-top: var(--space-4);"></div>
+      {% else %}
+      <div style="padding: var(--space-4); background-color: var(--bg-secondary); border-radius: var(--radius-md); color: var(--text-secondary);">
+        <p style="margin: 0;">⚠️ Routing tool is not available. Please configure OpenRouteService API to use this feature.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Information Section -->
+<div style="margin-top: var(--space-8);">
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">ℹ️ About Domain Tools</h2>
+    </div>
+    <div class="card-body">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: var(--space-6);">
+        <div>
+          <h3 style="font-weight: 600; margin-bottom: var(--space-3); color: var(--text-primary);">🌡️ Weather</h3>
+          <ul style="margin: 0; padding-left: var(--space-5); color: var(--text-secondary);">
+            <li style="margin-bottom: var(--space-2);">Current weather conditions</li>
+            <li style="margin-bottom: var(--space-2);">Temperature, humidity, wind speed</li>
+            <li style="margin-bottom: var(--space-2);">Optional 7-day forecast</li>
+            <li>Powered by OpenWeatherMap API</li>
+          </ul>
+        </div>
+        <div>
+          <h3 style="font-weight: 600; margin-bottom: var(--space-3); color: var(--text-primary);">📈 Stock Market</h3>
+          <ul style="margin: 0; padding-left: var(--space-5); color: var(--text-secondary);">
+            <li style="margin-bottom: var(--space-2);">Real-time stock prices</li>
+            <li style="margin-bottom: var(--space-2);">Historical data (1d to 10y)</li>
+            <li style="margin-bottom: var(--space-2);">Market cap, P/E ratio, dividend yield</li>
+            <li>Powered by yfinance & Alpha Vantage</li>
+          </ul>
+        </div>
+        <div>
+          <h3 style="font-weight: 600; margin-bottom: var(--space-3); color: var(--text-primary);">🗺️ Route Planner</h3>
+          <ul style="margin: 0; padding-left: var(--space-5); color: var(--text-secondary);">
+            <li style="margin-bottom: var(--space-2);">Multiple travel modes</li>
+            <li style="margin-bottom: var(--space-2);">Distance and duration estimates</li>
+            <li style="margin-bottom: var(--space-2);">Turn-by-turn directions</li>
+            <li>Powered by OpenRouteService API</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

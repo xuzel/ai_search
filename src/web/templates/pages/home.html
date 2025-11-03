@@ -1,0 +1,214 @@
+{% extends "base_new.html" %}
+
+{% block title %}AI Search Engine - Home{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<div style="text-align: center; margin-bottom: var(--space-12);">
+  <h1 style="font-size: var(--text-4xl); font-weight: 700; margin-bottom: var(--space-4); color: var(--text-primary);">
+    🤖 AI Search Engine
+  </h1>
+  <p style="font-size: var(--text-lg); color: var(--text-secondary); max-width: 600px; margin: 0 auto;">
+    Intelligent search powered by LLM. Ask anything, get smart answers.
+  </p>
+</div>
+
+<!-- Unified Search Box -->
+<div class="search-container">
+  <form hx-post="/query" hx-target="#results" hx-indicator="#loading" class="search-box">
+    <div class="search-input-wrapper">
+      <span class="search-icon">🔍</span>
+      <input
+        type="text"
+        name="query"
+        class="search-input"
+        placeholder="Ask anything... (e.g., 'What is AI?', 'Calculate 15% of 200', 'Tell me a joke')"
+        required
+        autocomplete="off"
+        autofocus
+      />
+      <button type="submit" class="btn btn-primary search-submit">Search</button>
+    </div>
+
+    <!-- Type Indicator (shown after classification) -->
+    <div id="typeIndicator" class="search-type-indicator" style="display: none;">
+      <span>Detected mode:</span>
+      <span id="typeBadge" class="search-type-badge"></span>
+      <span style="margin-left: auto; font-size: var(--text-xs);">
+        <a href="#" onclick="showManualModes(); return false;" style="color: var(--color-primary);">Change mode</a>
+      </span>
+    </div>
+  </form>
+
+  <!-- Loading Indicator -->
+  <div id="loading" class="loading-container htmx-indicator">
+    <div class="spinner"></div>
+    <div class="loading-text">Processing your request...</div>
+  </div>
+</div>
+
+<!-- Results Container -->
+<div id="results"></div>
+
+<!-- Feature Cards -->
+<div style="margin-top: var(--space-16);">
+  <h2 style="font-size: var(--text-2xl); font-weight: 600; margin-bottom: var(--space-6); text-align: center; color: var(--text-primary);">
+    What can I do?
+  </h2>
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--space-6);">
+    <!-- Research Mode -->
+    <div class="card card-interactive" onclick="document.querySelector('.search-input').focus()">
+      <div class="card-header">
+        <div style="font-size: var(--text-3xl); margin-bottom: var(--space-3);">🔍</div>
+        <h3 class="card-title">Research</h3>
+        <p class="card-subtitle">Web search with AI-powered synthesis</p>
+      </div>
+      <div class="card-body">
+        <p style="color: var(--text-secondary); line-height: 1.6;">
+          Search the web, scrape content, and get comprehensive AI-generated summaries with source citations.
+        </p>
+      </div>
+      <div class="card-footer">
+        <span class="badge badge-primary">Real-time</span>
+        <span class="badge badge-secondary">Multi-source</span>
+      </div>
+    </div>
+
+    <!-- Code Mode -->
+    <div class="card card-interactive" onclick="document.querySelector('.search-input').focus()">
+      <div class="card-header">
+        <div style="font-size: var(--text-3xl); margin-bottom: var(--space-3);">💻</div>
+        <h3 class="card-title">Code</h3>
+        <p class="card-subtitle">Generate and execute Python code</p>
+      </div>
+      <div class="card-body">
+        <p style="color: var(--text-secondary); line-height: 1.6;">
+          Solve math problems, perform calculations, and run Python code in a secure sandbox environment.
+        </p>
+      </div>
+      <div class="card-footer">
+        <span class="badge badge-primary">Safe</span>
+        <span class="badge badge-secondary">Python</span>
+      </div>
+    </div>
+
+    <!-- Document Q&A -->
+    <div class="card card-interactive" onclick="window.location.href='/rag'">
+      <div class="card-header">
+        <div style="font-size: var(--text-3xl); margin-bottom: var(--space-3);">📚</div>
+        <h3 class="card-title">Document Q&A</h3>
+        <p class="card-subtitle">Upload documents and ask questions</p>
+      </div>
+      <div class="card-body">
+        <p style="color: var(--text-secondary); line-height: 1.6;">
+          Upload PDFs, documents, and get intelligent answers based on your content with source citations.
+        </p>
+      </div>
+      <div class="card-footer">
+        <span class="badge badge-success">Available Now</span>
+        <span class="badge badge-secondary">RAG</span>
+      </div>
+    </div>
+
+    <!-- Chat Mode -->
+    <div class="card card-interactive" onclick="window.location.href='/chat'">
+      <div class="card-header">
+        <div style="font-size: var(--text-3xl); margin-bottom: var(--space-3);">💬</div>
+        <h3 class="card-title">Chat</h3>
+        <p class="card-subtitle">Conversational AI assistant</p>
+      </div>
+      <div class="card-body">
+        <p style="color: var(--text-secondary); line-height: 1.6;">
+          Have natural conversations, get creative help, and ask general questions.
+        </p>
+      </div>
+      <div class="card-footer">
+        <span class="badge badge-secondary">Interactive</span>
+        <span class="badge badge-secondary">LLM</span>
+      </div>
+    </div>
+
+    <!-- Image & OCR -->
+    <div class="card" style="opacity: 0.7;">
+      <div class="card-header">
+        <div style="font-size: var(--text-3xl); margin-bottom: var(--space-3);">🖼️</div>
+        <h3 class="card-title">Image & OCR</h3>
+        <p class="card-subtitle">Extract text and understand images</p>
+      </div>
+      <div class="card-body">
+        <p style="color: var(--text-secondary); line-height: 1.6;">
+          Extract text from images (OCR) or get AI-powered image analysis and descriptions.
+        </p>
+      </div>
+      <div class="card-footer">
+        <span class="badge badge-warning">Coming Soon</span>
+        <span class="badge badge-secondary">Multimodal</span>
+      </div>
+    </div>
+
+    <!-- Tools -->
+    <div class="card" style="opacity: 0.7;">
+      <div class="card-header">
+        <div style="font-size: var(--text-3xl); margin-bottom: var(--space-3);">🛠️</div>
+        <h3 class="card-title">Domain Tools</h3>
+        <p class="card-subtitle">Weather, stocks, routes & more</p>
+      </div>
+      <div class="card-body">
+        <p style="color: var(--text-secondary); line-height: 1.6;">
+          Access specialized tools for weather forecasts, stock prices, route planning, and more.
+        </p>
+      </div>
+      <div class="card-footer">
+        <span class="badge badge-warning">Coming Soon</span>
+        <span class="badge badge-secondary">API</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Example Queries -->
+<div style="margin-top: var(--space-16); text-align: center;">
+  <h3 style="font-size: var(--text-xl); font-weight: 600; margin-bottom: var(--space-4); color: var(--text-secondary);">
+    Try these examples
+  </h3>
+  <div style="display: flex; flex-wrap: wrap; gap: var(--space-3); justify-content: center;">
+    <button class="btn btn-outline btn-sm" onclick="fillQuery('What is machine learning?')">
+      What is machine learning?
+    </button>
+    <button class="btn btn-outline btn-sm" onclick="fillQuery('Calculate 25% of 480')">
+      Calculate 25% of 480
+    </button>
+    <button class="btn btn-outline btn-sm" onclick="fillQuery('Write a Python function to reverse a string')">
+      Write a Python function
+    </button>
+    <button class="btn btn-outline btn-sm" onclick="fillQuery('Tell me a fun fact')">
+      Tell me a fun fact
+    </button>
+  </div>
+</div>
+
+<script>
+// Fill query in search box
+function fillQuery(text) {
+  const input = document.querySelector('.search-input');
+  input.value = text;
+  input.focus();
+}
+
+// Show manual mode selection
+function showManualModes() {
+  // This will be implemented in Phase 1.2
+  alert('Manual mode selection coming in Phase 1.2!');
+}
+
+// Make showToast available globally
+function showToast(message, type) {
+  if (window.utils && window.utils.showToast) {
+    window.utils.showToast(message, type);
+  } else {
+    alert(message);
+  }
+}
+</script>
+{% endblock %}

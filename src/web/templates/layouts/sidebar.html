@@ -1,0 +1,103 @@
+<!-- Sidebar Navigation -->
+<aside class="sidebar" id="sidebar">
+  <!-- Sidebar Header -->
+  <div class="sidebar-header">
+    <a href="/" class="sidebar-logo">
+      <span class="sidebar-logo-icon">🤖</span>
+      <span>AI Search</span>
+    </a>
+  </div>
+
+  <!-- Main Navigation -->
+  <nav class="sidebar-nav">
+    <!-- Main Section -->
+    <div class="nav-section">
+      <div class="nav-section-title">Main</div>
+      <a href="/" class="nav-item {% if request.url.path == '/' %}active{% endif %}">
+        <span class="nav-item-icon">🏠</span>
+        <span>Home</span>
+      </a>
+      <a href="/" class="nav-item">
+        <span class="nav-item-icon">🔍</span>
+        <span>Research</span>
+      </a>
+      <a href="/" class="nav-item">
+        <span class="nav-item-icon">💻</span>
+        <span>Code</span>
+      </a>
+      <a href="/chat" class="nav-item {% if request.url.path.startswith('/chat') %}active{% endif %}">
+        <span class="nav-item-icon">💬</span>
+        <span>Chat</span>
+      </a>
+    </div>
+
+    <!-- Features Section -->
+    <div class="nav-section">
+      <div class="nav-section-title">Features</div>
+      <a href="/rag" class="nav-item {% if request.url.path.startswith('/rag') %}active{% endif %}">
+        <span class="nav-item-icon">📚</span>
+        <span>Document Q&A</span>
+        <span class="badge badge-success nav-item-badge">New</span>
+      </a>
+      <a href="/multimodal" class="nav-item {% if request.url.path.startswith('/multimodal') %}active{% endif %}">
+        <span class="nav-item-icon">🖼️</span>
+        <span>Image & OCR</span>
+        <span class="badge badge-success nav-item-badge">New</span>
+      </a>
+      <a href="/tools" class="nav-item {% if request.url.path.startswith('/tools') %}active{% endif %}">
+        <span class="nav-item-icon">🛠️</span>
+        <span>Domain Tools</span>
+        <span class="badge badge-success nav-item-badge">New</span>
+      </a>
+    </div>
+
+    <!-- History & Settings -->
+    <div class="nav-section">
+      <div class="nav-section-title">Other</div>
+      <a href="/history" class="nav-item {% if request.url.path.startswith('/history') %}active{% endif %}">
+        <span class="nav-item-icon">📜</span>
+        <span>History</span>
+      </a>
+    </div>
+  </nav>
+
+  <!-- Sidebar Footer -->
+  <div class="sidebar-footer">
+    <div style="font-size: var(--text-sm); color: var(--text-tertiary); text-align: center;">
+      AI Search Engine v2.0
+    </div>
+  </div>
+</aside>
+
+<!-- Mobile Overlay -->
+<div class="mobile-overlay" id="mobileOverlay" onclick="toggleSidebar()"></div>
+
+<style>
+.mobile-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: var(--bg-overlay);
+  z-index: calc(var(--z-fixed) - 1);
+}
+
+@media (max-width: 768px) {
+  .sidebar.mobile-open + .mobile-overlay {
+    display: block;
+  }
+}
+</style>
+
+<script>
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const mainContent = document.querySelector('.main-content');
+  const overlay = document.getElementById('mobileOverlay');
+
+  sidebar.classList.toggle('mobile-open');
+  overlay.classList.toggle('active');
+}
+</script>

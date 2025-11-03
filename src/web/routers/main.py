@@ -8,9 +8,12 @@ router = APIRouter()
 
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    """Render the main page with unified search box"""
+    """Render the new home page with unified search box"""
     templates = request.app.state.templates
     return templates.TemplateResponse(
-        "index.html",
-        {"request": request}
+        "pages/home.html",
+        {
+            "request": request,
+            "breadcrumb_section": "Home"
+        }
     )

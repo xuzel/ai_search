@@ -1,0 +1,28 @@
+AI Search Engine Project Overview
+
+This is a comprehensive AI-powered search engine built with Python.
+
+Key Features:
+1. LLM-based query understanding and response generation
+2. Web search integration via SerpAPI
+3. RAG (Retrieval-Augmented Generation) for document Q&A
+4. Code generation and execution capabilities
+5. Multi-modal support (OCR, Vision API)
+6. Workflow orchestration for complex tasks
+
+Technical Stack:
+- LLM: Aliyun DashScope (Qwen models)
+- Vector Database: Chroma
+- Search API: SerpAPI
+- Document Processing: PyMuPDF, python-docx
+- OCR: PaddleOCR
+- Vision: Google Gemini 2.0
+
+Project Status:
+Phase 1-5 implementation completed with 95%+ coverage.
+Core functionality fully operational.
+
+Contact Information:
+Project: AI Search Engine
+Version: 1.0
+Date: 2025-11-02

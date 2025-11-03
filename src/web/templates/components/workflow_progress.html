@@ -1,0 +1,405 @@
+<!-- Workflow Progress Template with WebSocket Real-time Updates -->
+
+<div class="workflow-progress-container">
+    <div class="progress-header">
+        <h2>Executing Workflow</h2>
+        <p class="progress-subtitle">Tasks are being executed in real-time</p>
+    </div>
+
+    <div class="progress-stats">
+        <div class="stat-item">
+            <span class="stat-label">Overall Progress</span>
+            <div class="progress-bar">
+                <div class="progress-fill" id="overallProgress" style="width: 0%"></div>
+            </div>
+            <span class="stat-value"><span id="progressPercent">0</span>%</span>
+        </div>
+    </div>
+
+    <div class="tasks-progress-section">
+        <h3>Task Status</h3>
+        <div class="tasks-progress-list" id="tasksProgressList">
+            <!-- Tasks will be added here via WebSocket -->
+            <div class="loading-placeholder">
+                <div class="spinner"></div>
+                <p>Initializing workflow...</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="workflowResults" class="workflow-results" style="display: none;">
+        <!-- Results will be displayed here when workflow completes -->
+    </div>
+</div>
+
+<style>
+.workflow-progress-container {
+    width: 100%;
+    max-width: 1000px;
+    margin: 20px auto;
+    padding: 20px;
+}
+
+.progress-header {
+    text-align: center;
+    margin-bottom: 30px;
+    border-bottom: 2px solid var(--accent-warm, #d4a574);
+    padding-bottom: 20px;
+}
+
+.progress-header h2 {
+    margin: 0 0 10px 0;
+    color: var(--text-primary, #333);
+}
+
+.progress-subtitle {
+    margin: 0;
+    color: var(--text-secondary, #666);
+    font-size: 14px;
+}
+
+.progress-stats {
+    margin-bottom: 30px;
+}
+
+.stat-item {
+    margin-bottom: 15px;
+}
+
+.stat-label {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--text-secondary, #666);
+    font-size: 12px;
+    text-transform: uppercase;
+    font-weight: bold;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 24px;
+    background: var(--bg-secondary, #f5f3f0);
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border-color, #e0e0e0);
+    margin-bottom: 8px;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-warm, #d4a574), var(--accent-dark, #b8925a));
+    width: 0%;
+    transition: width 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 8px;
+    color: white;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.stat-value {
+    display: inline-block;
+    color: var(--accent-warm, #d4a574);
+    font-weight: bold;
+    font-size: 14px;
+}
+
+.tasks-progress-section {
+    margin-bottom: 30px;
+}
+
+.tasks-progress-section h3 {
+    margin: 0 0 15px 0;
+    color: var(--text-primary, #333);
+    font-size: 18px;
+}
+
+.tasks-progress-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.loading-placeholder {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-secondary, #666);
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    margin: 0 auto 15px;
+    border: 4px solid var(--bg-secondary, #f5f3f0);
+    border-top-color: var(--accent-warm, #d4a574);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.task-progress-item {
+    display: flex;
+    gap: 12px;
+    padding: 12px;
+    background: var(--bg-secondary, #f5f3f0);
+    border-radius: 6px;
+    border-left: 4px solid;
+    align-items: center;
+    transition: all 0.3s ease;
+}
+
+.task-progress-item.pending {
+    border-color: var(--border-color, #e0e0e0);
+}
+
+.task-progress-item.running {
+    border-color: #f39c12;
+    background: #fffbf0;
+}
+
+.task-progress-item.completed {
+    border-color: #27ae60;
+    background: #f0fef5;
+}
+
+.task-progress-item.failed {
+    border-color: #e74c3c;
+    background: #fef5f5;
+}
+
+.task-status-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    flex-shrink: 0;
+    font-size: 16px;
+}
+
+.task-progress-item.pending .task-status-icon {
+    background: var(--bg-primary, #fff);
+    color: var(--text-secondary, #666);
+}
+
+.task-progress-item.running .task-status-icon {
+    background: #f39c12;
+    color: white;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+.task-progress-item.completed .task-status-icon {
+    background: #27ae60;
+    color: white;
+}
+
+.task-progress-item.failed .task-status-icon {
+    background: #e74c3c;
+    color: white;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+.task-progress-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.task-progress-name {
+    color: var(--text-primary, #333);
+    font-size: 14px;
+    font-weight: bold;
+    margin-bottom: 4px;
+}
+
+.task-progress-meta {
+    display: flex;
+    gap: 15px;
+    font-size: 12px;
+    color: var(--text-secondary, #666);
+}
+
+.task-progress-item.running .task-progress-bar {
+    display: block;
+}
+
+.task-progress-bar {
+    display: none;
+    width: 100%;
+    height: 4px;
+    background: var(--bg-primary, #fff);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 4px;
+}
+
+.task-progress-bar-fill {
+    height: 100%;
+    background: #f39c12;
+    width: 50%;
+    animation: progressAnimation 2s ease-in-out infinite;
+}
+
+@keyframes progressAnimation {
+    0% { width: 30%; }
+    50% { width: 70%; }
+    100% { width: 30%; }
+}
+
+.workflow-results {
+    margin-top: 30px;
+    padding-top: 30px;
+    border-top: 2px solid var(--border-color, #e0e0e0);
+}
+
+.result-success-message {
+    background: #f0fef5;
+    border-left: 4px solid #27ae60;
+    padding: 15px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+}
+
+.result-success-message h3 {
+    margin: 0 0 10px 0;
+    color: #27ae60;
+}
+
+.result-success-message p {
+    margin: 0;
+    color: #1e8449;
+}
+
+@media (max-width: 768px) {
+    .task-progress-item {
+        padding: 10px;
+    }
+
+    .task-progress-meta {
+        flex-direction: column;
+        gap: 2px;
+    }
+}
+</style>
+
+<script>
+// WebSocket handling for real-time progress updates
+let workflowId = null;
+let websocket = null;
+
+function initializeWorkflowProgress(id) {
+    workflowId = id;
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws/workflow/${workflowId}`;
+
+    console.log(`Connecting to workflow progress: ${wsUrl}`);
+
+    websocket = new WebSocket(wsUrl);
+
+    websocket.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        updateWorkflowProgress(data);
+    };
+
+    websocket.onerror = function(error) {
+        console.error('WebSocket error:', error);
+    };
+
+    websocket.onclose = function() {
+        console.log('WebSocket closed');
+    };
+}
+
+function updateWorkflowProgress(data) {
+    const tasksList = document.getElementById('tasksProgressList');
+
+    // Clear loading placeholder if first update
+    if (tasksList.querySelector('.loading-placeholder')) {
+        tasksList.innerHTML = '';
+    }
+
+    // Update overall progress
+    const progress = Math.round(data.progress * 100);
+    const progressFill = document.getElementById('overallProgress');
+    progressFill.style.width = progress + '%';
+    document.getElementById('progressPercent').textContent = progress;
+
+    // Update individual task statuses
+    for (const [taskId, taskStatus] of Object.entries(data.tasks || {})) {
+        updateTaskStatus(tasksList, taskId, taskStatus);
+    }
+
+    // Handle completion
+    if (data.completed) {
+        setTimeout(function() {
+            const resultsDiv = document.getElementById('workflowResults');
+            if (data.results) {
+                resultsDiv.innerHTML = generateResultsHTML(data.results);
+                resultsDiv.style.display = 'block';
+            }
+            if (websocket) {
+                websocket.close();
+            }
+        }, 500);
+    }
+}
+
+function updateTaskStatus(container, taskId, taskStatus) {
+    let taskEl = document.querySelector(`[data-task-id="${taskId}"]`);
+
+    if (!taskEl) {
+        taskEl = document.createElement('div');
+        taskEl.className = `task-progress-item ${taskStatus.status}`;
+        taskEl.setAttribute('data-task-id', taskId);
+        taskEl.innerHTML = `
+            <div class="task-status-icon">
+                ${getStatusIcon(taskStatus.status)}
+            </div>
+            <div class="task-progress-content">
+                <div class="task-progress-name">${taskId}</div>
+                <div class="task-progress-meta">
+                    <span>Status: ${taskStatus.status}</span>
+                </div>
+                <div class="task-progress-bar">
+                    <div class="task-progress-bar-fill"></div>
+                </div>
+            </div>
+        `;
+        container.appendChild(taskEl);
+    } else {
+        taskEl.className = `task-progress-item ${taskStatus.status}`;
+        const icon = taskEl.querySelector('.task-status-icon');
+        icon.innerHTML = getStatusIcon(taskStatus.status);
+    }
+}
+
+function getStatusIcon(status) {
+    switch(status) {
+        case 'pending':
+            return '○';
+        case 'running':
+            return '⟳';
+        case 'completed':
+            return '✓';
+        case 'failed':
+            return '✕';
+        default:
+            return '?';
+    }
+}
+
+function generateResultsHTML(results) {
+    // This should return HTML for the results
+    return '<div class="result-success-message"><h3>Workflow Completed!</h3><p>All tasks have been executed successfully.</p></div>';
+}
+</script>

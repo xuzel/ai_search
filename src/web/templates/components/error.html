@@ -1,0 +1,55 @@
+<!-- Error Component -->
+<div class="result-card">
+  <!-- Header -->
+  <div class="result-header">
+    <div>
+      <h2 class="result-title" style="color: var(--color-danger);">❌ Error</h2>
+      <div class="result-meta">
+        <span class="badge badge-danger">Failed</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Query Display (if available) -->
+  {% if query %}
+  <div style="padding: var(--space-4); background-color: var(--bg-tertiary); border-radius: var(--radius-md); margin-bottom: var(--space-6);">
+    <div style="font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-2);">
+      Your Query:
+    </div>
+    <div style="font-weight: 500;">{{ query }}</div>
+  </div>
+  {% endif %}
+
+  <!-- Error Message -->
+  <div class="alert alert-danger">
+    <div style="font-weight: 600; margin-bottom: var(--space-2);">
+      Something went wrong
+    </div>
+    <div style="font-family: var(--font-mono); font-size: var(--text-sm);">
+      {{ error_message | default('An unexpected error occurred. Please try again.') }}
+    </div>
+  </div>
+
+  <!-- Suggestions -->
+  <div style="margin-top: var(--space-6);">
+    <h4 style="font-size: var(--text-base); font-weight: 600; margin-bottom: var(--space-3); color: var(--text-primary);">
+      What you can do:
+    </h4>
+    <ul style="margin-left: var(--space-6); color: var(--text-secondary); line-height: 1.8;">
+      <li>Check your query and try rephrasing it</li>
+      <li>Try a different search mode</li>
+      <li>Check your internet connection</li>
+      <li>Wait a moment and try again</li>
+    </ul>
+  </div>
+
+  <!-- Actions -->
+  <div style="margin-top: var(--space-8); display: flex; gap: var(--space-3); flex-wrap: wrap;">
+    <button class="btn btn-primary" onclick="window.location.href='/'">
+      ← Try Again
+    </button>
+    <button class="btn btn-outline" onclick="window.location.href='/history'">
+      📜 View History
+    </button>
+  </div>
+</div>

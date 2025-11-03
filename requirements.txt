@@ -50,3 +50,39 @@ pytest-cov==4.1.0
 black==23.12.0
 flake8==6.1.0
 mypy==1.7.0
+
+# RAG Framework (Phase 1)
+llama-index
+llama-index-core
+llama-index-embeddings-huggingface
+langchain
+langchain-community
+
+# Vector Store
+chromadb==0.4.22
+sentence-transformers==2.3.1
+
+# Embeddings & Reranking (Phase 2)
+transformers==4.37.2
+torch==2.2.0
+
+# Document Processing
+pypdf==3.17.4
+pymupdf==1.23.8
+pdfplumber==0.10.3
+python-docx==1.1.0
+
+# Domain-Specific Tools (Phase 3)
+pyowm==3.3.0                 # Weather API
+yfinance==0.2.35             # Finance (fallback)
+alpha-vantage==2.3.1         # Finance (primary)
+openrouteservice==2.3.3      # Routing/Transportation
+
+# Multimodal Support (Phase 4)
+paddleocr             # OCR for Chinese/English
+paddlepaddle          # PaddleOCR backend (CPU)
+google-generativeai   # Gemini vision API
+pillow               # Image processing
+
+# Optional: Reranking API
+# cohere==4.47               # Faster reranking (paid)

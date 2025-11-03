@@ -1,0 +1,131 @@
+<!-- OCR Result -->
+<div class="result-card">
+  <div class="result-header">
+    <h2 class="result-title">📝 OCR Result</h2>
+    <div class="result-meta">
+      <span class="badge badge-info">OCR</span>
+      <span>{{ filename }}</span>
+    </div>
+  </div>
+
+  <!-- Query Display -->
+  <div style="padding: var(--space-4); background-color: var(--bg-tertiary); border-radius: var(--radius-md); margin-bottom: var(--space-4);">
+    <div style="font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-2);">
+      Image:
+    </div>
+    <div style="font-weight: 500; color: var(--text-primary);">
+      {{ query }}
+    </div>
+  </div>
+
+  <!-- Confidence Badge -->
+  <div style="display: flex; gap: var(--space-3); margin-bottom: var(--space-6);">
+    <div class="card" style="flex: 1; padding: var(--space-3);">
+      <div style="text-align: center;">
+        <div style="font-size: var(--text-2xl); font-weight: 700; color: var(--color-success);">
+          {{ (result.confidence * 100) | int }}%
+        </div>
+        <div style="font-size: var(--text-sm); color: var(--text-secondary); margin-top: var(--space-1);">
+          Average Confidence
+        </div>
+      </div>
+    </div>
+    <div class="card" style="flex: 1; padding: var(--space-3);">
+      <div style="text-align: center;">
+        <div style="font-size: var(--text-2xl); font-weight: 700; color: var(--color-primary);">
+          {{ result.raw_lines|length }}
+        </div>
+        <div style="font-size: var(--text-sm); color: var(--text-secondary); margin-top: var(--space-1);">
+          Text Lines
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Markdown Rendered Result -->
+  {% if result.markdown %}
+  <div class="result-content markdown-content">
+    {{ result.markdown|safe }}
+  </div>
+  {% endif %}
+
+  <!-- Raw Text Preview (Collapsible) -->
+  {% if result.text %}
+  <div style="margin-top: var(--space-6);">
+    <details style="border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: var(--space-4);">
+      <summary style="cursor: pointer; font-weight: 600; color: var(--text-primary);">
+        📋 Copy Full Text
+      </summary>
+      <div style="margin-top: var(--space-4);">
+        <div style="padding: var(--space-3); background-color: var(--bg-secondary); border-radius: var(--radius-sm); font-family: monospace; font-size: var(--text-sm); line-height: 1.6; color: var(--text-secondary); white-space: pre-wrap; word-break: break-word; max-height: 300px; overflow-y: auto;">
+{{ result.text }}
+        </div>
+        <button
+          type="button"
+          class="btn btn-ghost btn-sm"
+          style="margin-top: var(--space-3);"
+          onclick="navigator.clipboard.writeText(document.querySelector('pre').innerText); alert('Copied to clipboard!')"
+        >
+          📋 Copy Text
+        </button>
+      </div>
+    </details>
+  </div>
+  {% endif %}
+
+  <!-- Action Buttons -->
+  <div style="display: flex; gap: var(--space-2); margin-top: var(--space-6);">
+    <button
+      type="button"
+      class="btn btn-ghost btn-sm"
+      onclick="window.location.href = '/multimodal'"
+    >
+      ← Back
+    </button>
+    <button
+      type="button"
+      class="btn btn-primary btn-sm"
+      onclick="window.location.reload()"
+    >
+      🔄 New OCR
+    </button>
+  </div>
+</div>
+
+<style>
+.markdown-content {
+  overflow-x: auto;
+}
+
+.markdown-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: var(--space-3) 0;
+}
+
+.markdown-content th,
+.markdown-content td {
+  border: 1px solid var(--border-color);
+  padding: var(--space-2);
+  text-align: left;
+}
+
+.markdown-content th {
+  background-color: var(--bg-tertiary);
+  font-weight: 600;
+}
+
+.markdown-content code {
+  background-color: var(--bg-tertiary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+.markdown-content pre {
+  background-color: var(--bg-secondary);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+}
+</style>

@@ -1,0 +1,37 @@
+<!-- Result Card Component -->
+<div class="result-card">
+  <!-- Header -->
+  <div class="result-header">
+    <div>
+      <h2 class="result-title">{{ title | default('Result') }}</h2>
+      <div class="result-meta">
+        {% if task_type %}
+        <span class="badge badge-primary">{{ task_type }}</span>
+        {% endif %}
+        {% if confidence %}
+        <span style="color: var(--text-secondary);">Confidence: {{ (confidence * 100) | int }}%</span>
+        {% endif %}
+        {% if timestamp %}
+        <span style="color: var(--text-tertiary);">{{ timestamp }}</span>
+        {% endif %}
+      </div>
+    </div>
+    {% if actions %}
+    <div style="display: flex; gap: var(--space-2);">
+      {{ actions | safe }}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Content -->
+  <div class="result-content">
+    {{ content | safe }}
+  </div>
+
+  <!-- Footer -->
+  {% if footer %}
+  <div class="card-footer" style="margin-top: var(--space-4);">
+    {{ footer | safe }}
+  </div>
+  {% endif %}
+</div>

@@ -1,0 +1,80 @@
+<!-- Research Result Component -->
+<div class="result-card">
+  <!-- Header -->
+  <div class="result-header">
+    <div>
+      <h2 class="result-title">🔍 Research Results</h2>
+      <div class="result-meta">
+        <span class="badge badge-primary">{{ task_type | default('research') }}</span>
+        {% if confidence %}
+        <span style="color: var(--text-secondary);">Confidence: {{ (confidence * 100) | int }}%</span>
+        {% endif %}
+      </div>
+    </div>
+    <div>
+      <button class="btn btn-secondary btn-sm" onclick="window.location.href='/'">
+        New Search
+      </button>
+    </div>
+  </div>
+
+  <!-- Query Display -->
+  <div style="padding: var(--space-4); background-color: var(--bg-tertiary); border-radius: var(--radius-md); margin-bottom: var(--space-6);">
+    <div style="font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-2);">
+      Your Query:
+    </div>
+    <div style="font-weight: 500;">{{ query }}</div>
+  </div>
+
+  <!-- Summary -->
+  {% if result.summary %}
+  <div class="result-content">
+    <h3 style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-4); color: var(--text-primary);">
+      Summary
+    </h3>
+    <div style="line-height: 1.7;">
+      {{ result.summary | safe }}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Sources -->
+  {% if result.sources %}
+  <div style="margin-top: var(--space-8);">
+    <h3 style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-4); color: var(--text-primary);">
+      Sources ({{ result.sources | length }})
+    </h3>
+    <div class="source-list">
+      {% for source in result.sources %}
+      <div class="source-item">
+        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: var(--space-2);">
+          <h4 class="source-title">{{ source.title | default('Source ' ~ loop.index) }}</h4>
+          {% if source.credibility_score %}
+          <span class="credibility-badge {% if source.credibility_score >= 0.8 %}high{% elif source.credibility_score >= 0.5 %}medium{% else %}low{% endif %}">
+            {% if source.credibility_score >= 0.8 %}🏆 High{% elif source.credibility_score >= 0.5 %}✓ Medium{% else %}⚠️ Low{% endif %}
+            {{ (source.credibility_score * 100) | int }}%
+          </span>
+          {% endif %}
+        </div>
+        <a href="{{ source.url }}" target="_blank" class="source-url">{{ source.url }}</a>
+        {% if source.content %}
+        <p style="margin-top: var(--space-3); color: var(--text-secondary); font-size: var(--text-sm);">
+          {{ source.content[:200] }}...
+        </p>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Actions -->
+  <div style="margin-top: var(--space-8); display: flex; gap: var(--space-3); flex-wrap: wrap;">
+    <button class="btn btn-primary" onclick="window.location.href='/'">
+      ← New Search
+    </button>
+    <button class="btn btn-outline" onclick="window.location.href='/history'">
+      📜 View History
+    </button>
+  </div>
+</div>

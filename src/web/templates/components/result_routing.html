@@ -1,0 +1,195 @@
+<!-- Routing Result -->
+<div class="result-card">
+  <div class="result-header">
+    <h2 class="result-title">🗺️ Route Information</h2>
+    <div class="result-meta">
+      <span class="badge badge-info">Routing</span>
+      <span>{{ result.mode|upper }}</span>
+    </div>
+  </div>
+
+  <!-- Query Display -->
+  <div style="padding: var(--space-4); background-color: var(--bg-tertiary); border-radius: var(--radius-md); margin-bottom: var(--space-4);">
+    <div style="font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-2);">
+      Route Query:
+    </div>
+    <div style="font-weight: 500; color: var(--text-primary);">
+      {{ origin }} → {{ destination }}
+    </div>
+  </div>
+
+  <!-- Route Statistics -->
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-6);">
+    <div class="card" style="padding: var(--space-3);">
+      <div style="text-align: center;">
+        <div style="font-size: 24px;">📏</div>
+        <div style="font-size: var(--text-2xl); font-weight: 700; color: var(--color-primary); margin: var(--space-2) 0;">
+          {{ result.distance }}
+        </div>
+        <div style="font-size: var(--text-sm); color: var(--text-secondary);">
+          Distance
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="padding: var(--space-3);">
+      <div style="text-align: center;">
+        <div style="font-size: 24px;">⏱️</div>
+        <div style="font-size: var(--text-2xl); font-weight: 700; color: var(--color-warning); margin: var(--space-2) 0;">
+          {{ result.duration }}
+        </div>
+        <div style="font-size: var(--text-sm); color: var(--text-secondary);">
+          Duration
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="padding: var(--space-3);">
+      <div style="text-align: center;">
+        <div style="font-size: 24px;">{% if 'drive' in result.mode.lower() %}🚗{% elif 'walk' in result.mode.lower() %}🚶{% elif 'cycl' in result.mode.lower() %}🚴{% else %}🛣️{% endif %}</div>
+        <div style="font-size: var(--text-lg); font-weight: 700; color: var(--color-info); margin: var(--space-2) 0; text-transform: capitalize;">
+          {{ result.mode }}
+        </div>
+        <div style="font-size: var(--text-sm); color: var(--text-secondary);">
+          Travel Mode
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Markdown Rendered Result -->
+  {% if result.markdown %}
+  <div class="result-content markdown-content">
+    {{ result.markdown|safe }}
+  </div>
+  {% endif %}
+
+  <!-- Route Steps (Navigation) -->
+  {% if result.steps %}
+  <div style="margin-top: var(--space-6);">
+    <h3 style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-4); color: var(--text-primary);">
+      🧭 Turn-by-Turn Directions
+    </h3>
+    <div style="display: flex; flex-direction: column; gap: var(--space-2);">
+      {% for step in result.steps[:15] %}
+      <div style="padding: var(--space-3); background-color: var(--bg-secondary); border-radius: var(--radius-md); border-left: 4px solid var(--color-primary);">
+        <div style="display: flex; align-items: start; gap: var(--space-3);">
+          <div style="flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%; background-color: var(--color-primary); color: white; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: var(--text-sm);">
+            {{ loop.index }}
+          </div>
+          <div style="flex: 1;">
+            <div style="font-weight: 500; color: var(--text-primary); margin-bottom: var(--space-1);">
+              {{ step.instruction }}
+            </div>
+            <div style="font-size: var(--text-sm); color: var(--text-secondary);">
+              📏 {{ step.distance }} • ⏱️ {{ step.duration }}
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+
+      {% if result.steps|length > 15 %}
+      <div style="padding: var(--space-3); text-align: center; color: var(--text-secondary);">
+        ... 还有 {{ result.steps|length - 15 }} 步 ...
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Map Placeholder -->
+  <div style="margin-top: var(--space-6); height: 400px; background-color: var(--bg-secondary); border-radius: var(--radius-md); display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-secondary);">
+    <div style="font-size: 48px; margin-bottom: var(--space-3);">🗺️</div>
+    <div style="font-size: var(--text-lg); font-weight: 600;">Interactive Map</div>
+    <div style="font-size: var(--text-sm); margin-top: var(--space-2); text-align: center;">
+      Map visualization would be displayed here using Leaflet.js<br>
+      Route polyline available in result data
+    </div>
+  </div>
+
+  <!-- Route Info -->
+  <div style="margin-top: var(--space-6);">
+    <div style="padding: var(--space-4); background-color: var(--bg-secondary); border-radius: var(--radius-md);">
+      <h3 style="font-weight: 600; margin-bottom: var(--space-3); color: var(--text-primary);">
+        📍 Route Details
+      </h3>
+      <ul style="margin: 0; padding-left: var(--space-5); color: var(--text-secondary);">
+        <li style="margin-bottom: var(--space-2);">
+          <strong>Starting Point:</strong> {{ origin }}
+        </li>
+        <li style="margin-bottom: var(--space-2);">
+          <strong>Destination:</strong> {{ destination }}
+        </li>
+        <li style="margin-bottom: var(--space-2);">
+          <strong>Travel Mode:</strong> {{ result.mode|capitalize }}
+        </li>
+        <li style="margin-bottom: var(--space-2);">
+          <strong>Total Distance:</strong> {{ result.distance }}
+        </li>
+        <li style="margin-bottom: var(--space-2);">
+          <strong>Estimated Duration:</strong> {{ result.duration }}
+        </li>
+        <li>
+          <strong>Number of Steps:</strong> {{ result.steps|length }}
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Action Buttons -->
+  <div style="display: flex; gap: var(--space-2); margin-top: var(--space-6);">
+    <button
+      type="button"
+      class="btn btn-ghost btn-sm"
+      onclick="window.location.href = '/tools'"
+    >
+      ← Back
+    </button>
+    <button
+      type="button"
+      class="btn btn-primary btn-sm"
+      onclick="window.location.reload()"
+    >
+      🔄 New Route
+    </button>
+  </div>
+</div>
+
+<style>
+.markdown-content {
+  overflow-x: auto;
+}
+
+.markdown-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: var(--space-3) 0;
+}
+
+.markdown-content th,
+.markdown-content td {
+  border: 1px solid var(--border-color);
+  padding: var(--space-2);
+  text-align: left;
+}
+
+.markdown-content th {
+  background-color: var(--bg-tertiary);
+  font-weight: 600;
+}
+
+.markdown-content code {
+  background-color: var(--bg-tertiary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+.markdown-content pre {
+  background-color: var(--bg-secondary);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+}
+</style>

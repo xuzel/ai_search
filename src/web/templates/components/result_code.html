@@ -1,0 +1,110 @@
+<!-- Code Result Component -->
+<div class="result-card">
+  <!-- Header -->
+  <div class="result-header">
+    <div>
+      <h2 class="result-title">💻 Code Execution Results</h2>
+      <div class="result-meta">
+        <span class="badge badge-success">{{ task_type | default('code') }}</span>
+        {% if confidence %}
+        <span style="color: var(--text-secondary);">Confidence: {{ (confidence * 100) | int }}%</span>
+        {% endif %}
+        {% if result.success %}
+        <span class="badge badge-success">✅ Success</span>
+        {% else %}
+        <span class="badge badge-danger">❌ Error</span>
+        {% endif %}
+      </div>
+    </div>
+    <div>
+      <button class="btn btn-secondary btn-sm" onclick="window.location.href='/'">
+        New Problem
+      </button>
+    </div>
+  </div>
+
+  <!-- Query Display -->
+  <div style="padding: var(--space-4); background-color: var(--bg-tertiary); border-radius: var(--radius-md); margin-bottom: var(--space-6);">
+    <div style="font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-2);">
+      Your Query:
+    </div>
+    <div style="font-weight: 500;">{{ query }}</div>
+  </div>
+
+  <!-- Generated Code -->
+  {% if result.code %}
+  <div style="margin-bottom: var(--space-6);">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-3);">
+      <h3 style="font-size: var(--text-lg); font-weight: 600; color: var(--text-primary);">
+        Generated Code
+      </h3>
+      <button class="btn btn-outline btn-sm" onclick="copyCode()">
+        📋 Copy Code
+      </button>
+    </div>
+    <div style="background-color: #272822; color: #F8F8F2; padding: var(--space-4); border-radius: var(--radius-md); overflow-x: auto; font-family: var(--font-mono); font-size: var(--text-sm); line-height: 1.5;">
+      <pre id="codeBlock" style="margin: 0;"><code>{{ result.code }}</code></pre>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Execution Output -->
+  {% if result.output %}
+  <div style="margin-bottom: var(--space-6);">
+    <h3 style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-3); color: var(--text-primary);">
+      Execution Output
+    </h3>
+    <div style="background-color: var(--bg-tertiary); padding: var(--space-4); border-radius: var(--radius-md); border-left: 4px solid var(--color-success);">
+      <pre style="margin: 0; font-family: var(--font-mono); white-space: pre-wrap; word-wrap: break-word;">{{ result.output }}</pre>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Error -->
+  {% if result.error %}
+  <div style="margin-bottom: var(--space-6);">
+    <h3 style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-3); color: var(--color-danger);">
+      Error
+    </h3>
+    <div class="alert alert-danger">
+      <pre style="margin: 0; font-family: var(--font-mono); white-space: pre-wrap;">{{ result.error }}</pre>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Explanation -->
+  {% if result.explanation %}
+  <div style="margin-bottom: var(--space-6);">
+    <h3 style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-3); color: var(--text-primary);">
+      Explanation
+    </h3>
+    <div style="line-height: 1.7; color: var(--text-secondary);">
+      {{ result.explanation | safe }}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Actions -->
+  <div style="margin-top: var(--space-8); display: flex; gap: var(--space-3); flex-wrap: wrap;">
+    <button class="btn btn-primary" onclick="window.location.href='/'">
+      ← New Problem
+    </button>
+    <button class="btn btn-outline" onclick="window.location.href='/history'">
+      📜 View History
+    </button>
+  </div>
+</div>
+
+<script>
+function copyCode() {
+  const codeBlock = document.getElementById('codeBlock');
+  const text = codeBlock.textContent;
+
+  navigator.clipboard.writeText(text).then(() => {
+    showToast('Code copied to clipboard!', 'success');
+  }).catch(err => {
+    console.error('Failed to copy:', err);
+    showToast('Failed to copy code', 'danger');
+  });
+}
+</script>

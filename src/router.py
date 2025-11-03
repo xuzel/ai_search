@@ -22,6 +22,10 @@ class TaskType(Enum):
     RESEARCH = "research"
     CODE = "code"
     CHAT = "chat"
+    RAG = "rag"  # Document Q&A
+    DOMAIN_WEATHER = "domain_weather"  # Weather queries
+    DOMAIN_FINANCE = "domain_finance"  # Stock/finance queries
+    DOMAIN_ROUTING = "domain_routing"  # Routing/navigation queries
 
 
 class Router:
@@ -40,6 +44,31 @@ class Router:
         "write code", "generate code", "code",
         "数学", "formula", "equation",
         "algorithm", "function", "program",
+    ]
+
+    # Domain-specific keywords
+    RAG_KEYWORDS = [
+        "document", "file", "pdf", "analyze document",
+        "文档", "文件", "分析文档", "文档中",
+    ]
+
+    WEATHER_KEYWORDS = [
+        "weather", "temperature", "humidity", "forecast", "rain", "snow",
+        "天气", "温度", "湿度", "预报", "下雨", "下雪", "气温",
+        "climate", "气候",
+    ]
+
+    FINANCE_KEYWORDS = [
+        "stock", "price", "market", "ticker", "shares", "nasdaq", "dow",
+        "股票", "股价", "市场", "股市", "证券", "涨", "跌",
+        "crypto", "bitcoin", "ethereum", "加密货币", "比特币",
+        "trading", "交易", "投资",
+    ]
+
+    ROUTING_KEYWORDS = [
+        "route", "direction", "navigate", "travel", "driving", "distance",
+        "路线", "导航", "行驶", "距离", "怎么走", "怎么去",
+        "from", "to", "从", "到", "去",
     ]
 
     # Keywords that suggest calculation/computation (more lenient than CODE_KEYWORDS)
@@ -96,7 +125,30 @@ class Router:
 
         query_lower = query.lower().strip()
 
-        # Priority 1: Explicit CODE keywords (highest)
+        # Priority 0: Domain-specific queries (highest priority)
+        # Weather queries
+        for keyword in Router.WEATHER_KEYWORDS:
+            if keyword in query_lower:
+                return TaskType.DOMAIN_WEATHER
+
+        # Finance queries (check for stock symbols or finance terms)
+        for keyword in Router.FINANCE_KEYWORDS:
+            if keyword in query_lower:
+                return TaskType.DOMAIN_FINANCE
+
+        # Routing queries
+        for keyword in Router.ROUTING_KEYWORDS:
+            if keyword in query_lower:
+                # Additional check: must have location indicators
+                if any(loc in query_lower for loc in ["from", "to", "从", "到", "去"]):
+                    return TaskType.DOMAIN_ROUTING
+
+        # RAG/Document queries
+        for keyword in Router.RAG_KEYWORDS:
+            if keyword in query_lower:
+                return TaskType.RAG
+
+        # Priority 1: Explicit CODE keywords
         for keyword in Router.CODE_KEYWORDS:
             if keyword in query_lower:
                 return TaskType.CODE
@@ -240,38 +292,48 @@ class Router:
 
         classification_prompt = f"""你是一个查询分类助手。请分析以下用户查询，并判断它属于以下哪个类别：
 
-1. **CODE**: 代码执行/计算问题
-   - 数学问题（计算、求解）
-   - 单位转换（多少小时在一周内）
-   - 编程任务
-   - 百分比计算
+1. **DOMAIN_WEATHER**: 天气查询
+   - 天气、温度、湿度、预报
+   - 示例: "北京今天天气", "What's the weather in Tokyo", "会下雨吗"
+
+2. **DOMAIN_FINANCE**: 金融/股票查询
+   - 股票价格、市场数据、加密货币
+   - 示例: "AAPL股价", "Bitcoin price", "特斯拉今天涨了吗"
+
+3. **DOMAIN_ROUTING**: 路线/导航查询
+   - 路线规划、距离、行程时间
+   - 示例: "从上海到北京怎么走", "How to get from A to B", "路线距离多远"
+
+4. **RAG**: 文档问答
+   - 查询已上传的文档内容
+   - 示例: "文档中提到了什么", "这个PDF的主要内容", "分析这份报告"
+
+5. **CODE**: 代码执行/计算问题
+   - 数学计算、编程任务
    - 示例: "一周有多少小时", "计算10!", "Convert 2km to miles"
 
-2. **RESEARCH**: 信息查询/网络搜索
-   - 需要实时信息（天气、价格等）
-   - 知识查询
-   - 概念解释
-   - 示例: "澳门现在的湿度是多少", "What is machine learning", "最近的AI突破"
+6. **RESEARCH**: 信息查询/网络搜索
+   - 需要网络搜索的知识查询
+   - 示例: "What is machine learning", "最近的AI突破", "谁发明了电灯"
 
-3. **CHAT**: 常规对话
-   - 闲聊
-   - 问候
-   - 不属于上述两类的日常对话
+7. **CHAT**: 常规对话
+   - 闲聊、问候
    - 示例: "你好", "Hi there"
 
 用户查询: "{query}"
 
 请按以下JSON格式返回结果（只返回JSON，不要其他内容）：
 {{
-    "task_type": "CODE|RESEARCH|CHAT",
+    "task_type": "DOMAIN_WEATHER|DOMAIN_FINANCE|DOMAIN_ROUTING|RAG|CODE|RESEARCH|CHAT",
     "confidence": 0.0-1.0,
     "reason": "简短的分类理由"
 }}
 
 重要规则:
-- 如果查询要求"现在"、"当前"、"实时"的数据 → RESEARCH
-- 如果是计算/转换（不涉及实时数据） → CODE
-- 含糊不清时倾向于RESEARCH而非CODE"""
+- 领域专用查询优先级最高（天气、金融、路线、文档）
+- 计算问题 → CODE
+- 需要网络搜索的知识查询 → RESEARCH
+- 含糊不清时倾向于RESEARCH"""
 
         try:
             response = await llm_manager.complete(
@@ -300,12 +362,17 @@ class Router:
             confidence = float(result.get("confidence", 0.5))
 
             # Map string to TaskType
-            if task_type_str == "CODE":
-                return TaskType.CODE, confidence
-            elif task_type_str == "RESEARCH":
-                return TaskType.RESEARCH, confidence
-            else:
-                return TaskType.CHAT, confidence
+            task_type_map = {
+                "DOMAIN_WEATHER": TaskType.DOMAIN_WEATHER,
+                "DOMAIN_FINANCE": TaskType.DOMAIN_FINANCE,
+                "DOMAIN_ROUTING": TaskType.DOMAIN_ROUTING,
+                "RAG": TaskType.RAG,
+                "CODE": TaskType.CODE,
+                "RESEARCH": TaskType.RESEARCH,
+                "CHAT": TaskType.CHAT,
+            }
+
+            return task_type_map.get(task_type_str, TaskType.CHAT), confidence
 
         except Exception as e:
             logger.error(f"LLM classification failed: {e}, falling back to keyword-based")

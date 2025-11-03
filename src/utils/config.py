@@ -90,6 +90,84 @@ class CLIConfig(BaseModel):
     verbose: bool = False
     show_sources: bool = True
 
+class RAGChunkingConfig(BaseModel):
+    """RAG Chunking Configuration"""
+    strategy: str = "semantic"
+    chunk_size: int = 512
+    chunk_overlap: int = 77
+    min_chunk_size: int = 100
+
+class RAGRetrievalConfig(BaseModel):
+    """RAG Retrieval Configuration"""
+    top_k: int = 10
+    similarity_threshold: float = 0.7
+
+class RAGRerankingConfig(BaseModel):
+    """RAG Reranking Configuration"""
+    enabled: bool = False
+    model: str = "BAAI/bge-reranker-large"
+    top_k: int = 3
+
+class RAGConfig(BaseModel):
+    """RAG Configuration"""
+    enabled: bool = True
+    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
+    embedding_dimension: int = 384
+    device: str = "cpu"
+    persist_directory: str = "./data/vector_store"
+    collection_name: str = "documents"
+    chunking: RAGChunkingConfig = Field(default_factory=RAGChunkingConfig)
+    retrieval: RAGRetrievalConfig = Field(default_factory=RAGRetrievalConfig)
+    reranking: RAGRerankingConfig = Field(default_factory=RAGRerankingConfig)
+
+class WeatherToolConfig(BaseModel):
+    """Weather Tool Configuration"""
+    enabled: bool = False
+    provider: str = "openweathermap"
+    api_key: str = Field(default_factory=lambda: os.getenv('OPENWEATHERMAP_API_KEY', ''))
+    units: str = "metric"
+    language: str = "zh_cn"
+
+class FinanceToolConfig(BaseModel):
+    """Finance Tool Configuration"""
+    enabled: bool = False
+    primary_provider: str = "alpha_vantage"
+    alpha_vantage_key: str = Field(default_factory=lambda: os.getenv('ALPHA_VANTAGE_API_KEY', ''))
+    fallback_provider: str = "yfinance"
+    cache_ttl: int = 300
+
+class RoutingToolConfig(BaseModel):
+    """Routing Tool Configuration"""
+    enabled: bool = False
+    provider: str = "openrouteservice"
+    api_key: str = Field(default_factory=lambda: os.getenv('OPENROUTESERVICE_API_KEY', ''))
+    default_profile: str = "driving-car"
+
+class DomainToolsConfig(BaseModel):
+    """Domain Tools Configuration"""
+    weather: WeatherToolConfig = Field(default_factory=WeatherToolConfig)
+    finance: FinanceToolConfig = Field(default_factory=FinanceToolConfig)
+    routing: RoutingToolConfig = Field(default_factory=RoutingToolConfig)
+
+class OCRConfig(BaseModel):
+    """OCR Configuration"""
+    enabled: bool = False
+    provider: str = "paddleocr"
+    languages: list = Field(default_factory=lambda: ["ch", "en"])
+    use_gpu: bool = False
+
+class VisionConfig(BaseModel):
+    """Vision API Configuration"""
+    enabled: bool = False
+    provider: str = "gemini"
+    model: str = "gemini-2.5-pro"
+    api_key: str = Field(default_factory=lambda: os.getenv('GOOGLE_API_KEY', ''))
+
+class MultimodalConfig(BaseModel):
+    """Multimodal Configuration"""
+    ocr: OCRConfig = Field(default_factory=OCRConfig)
+    vision: VisionConfig = Field(default_factory=VisionConfig)
+
 class Config(BaseModel):
     """Main Configuration Class"""
     llm: LLMConfig = Field(default_factory=LLMConfig)
@@ -99,6 +177,9 @@ class Config(BaseModel):
     research: ResearchConfig = Field(default_factory=ResearchConfig)
     cache: CacheConfig = Field(default_factory=CacheConfig)
     cli: CLIConfig = Field(default_factory=CLIConfig)
+    rag: RAGConfig = Field(default_factory=RAGConfig)
+    domain_tools: DomainToolsConfig = Field(default_factory=DomainToolsConfig)
+    multimodal: MultimodalConfig = Field(default_factory=MultimodalConfig)
 
 def _substitute_env_vars(value: Any) -> Any:
     """

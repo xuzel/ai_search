@@ -4,7 +4,7 @@
 llm:
   # OpenAI Configuration
   openai:
-    enabled: false  # Disable if not using OpenAI directly
+    enabled: false  # Enable if OpenAI API key is available
     api_key: ${OPENAI_API_KEY}
     model: gpt-3.5-turbo
     temperature: 0.7
@@ -116,3 +116,74 @@ cache:
   ttl_seconds: 3600
   backend: sqlite  # Options: sqlite, redis
   db_path: ./cache/search_cache.db
+
+# RAG Configuration
+rag:
+  enabled: true
+  embedding_model: "sentence-transformers/all-MiniLM-L6-v2"  # Lightweight model
+  # For Chinese/English: "jinaai/jina-embeddings-v2-base-zh" (requires pip install jina-embeddings-v2)
+  embedding_dimension: 384
+  device: "cpu"  # or "cuda" for GPU
+
+  # Vector store settings
+  persist_directory: "./data/vector_store"
+  collection_name: "documents"
+
+  # Chunking strategy
+  chunking:
+    strategy: "semantic"  # Options: fixed, semantic, recursive
+    chunk_size: 512       # Target chunk size in characters
+    chunk_overlap: 77     # 15% overlap (recommended)
+    min_chunk_size: 100   # Minimum chunk size
+
+  # Retrieval settings
+  retrieval:
+    top_k: 10               # Number of chunks to retrieve
+    similarity_threshold: 0.7  # Minimum similarity score
+
+  # Reranking (Phase 2)
+  reranking:
+    enabled: false  # Enable after installing BGE reranker
+    model: "BAAI/bge-reranker-large"
+    top_k: 3
+
+# Domain-Specific Tools Configuration
+domain_tools:
+  # Weather API
+  weather:
+    enabled: true
+    provider: "openweathermap"
+    api_key: ${OPENWEATHERMAP_API_KEY}
+    units: "metric"  # or "imperial"
+    language: "zh_cn"  # Chinese
+
+  # Finance APIs
+  finance:
+    enabled: true
+    primary_provider: "alpha_vantage"
+    alpha_vantage_key: ${ALPHA_VANTAGE_API_KEY}
+    fallback_provider: "yfinance"
+    cache_ttl: 300  # 5 minutes
+
+  # Routing/Transportation
+  routing:
+    enabled: true
+    provider: "openrouteservice"
+    api_key: ${OPENROUTESERVICE_API_KEY}
+    default_profile: "driving-car"  # Options: driving-car, cycling, walking
+
+# Multimodal Support Configuration
+multimodal:
+  # OCR settings
+  ocr:
+    enabled: true
+    provider: "paddleocr"
+    languages: ["ch", "en"]  # Chinese and English
+    use_gpu: false
+
+  # Vision API settings
+  vision:
+    enabled: true
+    provider: "gemini"  # Options: gemini, gpt4v, claude
+    model: "gemini-2.5-pro"
+    api_key: ${GOOGLE_API_KEY}

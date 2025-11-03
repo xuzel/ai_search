@@ -1,0 +1,119 @@
+<!-- File Upload Component -->
+<div class="file-upload-wrapper">
+  <div
+    class="file-upload-area"
+    id="{{ upload_id | default('fileUpload') }}"
+    ondragover="handleDragOver(event)"
+    ondragleave="handleDragLeave(event)"
+    ondrop="handleDrop(event)"
+    onclick="document.getElementById('{{ input_id | default('fileInput') }}').click()"
+  >
+    <div class="file-upload-icon">📁</div>
+    <div class="file-upload-text">
+      Drag & drop files here or click to browse
+    </div>
+    <div class="file-upload-hint">
+      {{ allowed_types | default('Supported: PDF, TXT, MD, DOCX') }}
+      {% if max_size %}
+      • Max size: {{ max_size }}
+      {% endif %}
+    </div>
+  </div>
+
+  <input
+    type="file"
+    id="{{ input_id | default('fileInput') }}"
+    name="{{ name | default('file') }}"
+    {% if multiple %}multiple{% endif %}
+    accept="{{ accept | default('.pdf,.txt,.md,.docx') }}"
+    style="display: none;"
+    onchange="handleFileSelect(event)"
+  />
+
+  <!-- Selected Files List -->
+  <div id="{{ list_id | default('fileList') }}" class="file-list" style="margin-top: var(--space-4);"></div>
+</div>
+
+<script>
+function handleDragOver(event) {
+  event.preventDefault();
+  event.currentTarget.classList.add('drag-over');
+}
+
+function handleDragLeave(event) {
+  event.currentTarget.classList.remove('drag-over');
+}
+
+function handleDrop(event) {
+  event.preventDefault();
+  event.currentTarget.classList.remove('drag-over');
+
+  const files = event.dataTransfer.files;
+  const inputId = '{{ input_id | default("fileInput") }}';
+  const input = document.getElementById(inputId);
+
+  // Transfer files to input element
+  input.files = files;
+  handleFileSelect({target: input});
+}
+
+function handleFileSelect(event) {
+  const files = event.target.files;
+  const listId = '{{ list_id | default("fileList") }}';
+  const fileList = document.getElementById(listId);
+
+  if (!fileList) return;
+
+  fileList.innerHTML = '';
+
+  Array.from(files).forEach((file, index) => {
+    const fileItem = document.createElement('div');
+    fileItem.className = 'file-item';
+    fileItem.style.cssText = `
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--space-3);
+      background-color: var(--bg-secondary);
+      border-radius: var(--radius-md);
+      margin-bottom: var(--space-2);
+    `;
+
+    fileItem.innerHTML = `
+      <div style="display: flex; align-items: center; gap: var(--space-3);">
+        <span style="font-size: var(--text-xl);">📄</span>
+        <div>
+          <div style="font-weight: 500;">${file.name}</div>
+          <div style="font-size: var(--text-sm); color: var(--text-secondary);">
+            ${formatFileSize(file.size)}
+          </div>
+        </div>
+      </div>
+      <button type="button" class="btn btn-ghost btn-sm" onclick="removeFile(${index})">
+        ❌
+      </button>
+    `;
+
+    fileList.appendChild(fileItem);
+  });
+}
+
+function formatFileSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+}
+
+function removeFile(index) {
+  // This is a simplified version - in production, you'd need to handle FileList manipulation
+  console.log('Remove file at index:', index);
+  showToast('File removed', 'success');
+}
+</script>
+
+<style>
+.file-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+</style>

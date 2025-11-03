@@ -1,0 +1,90 @@
+<!-- RAG Query Result -->
+<div class="result-card">
+  <div class="result-header">
+    <h2 class="result-title">📚 Answer from Documents</h2>
+    <div class="result-meta">
+      <span class="badge badge-success">RAG</span>
+      <span>Retrieved {{ result.retrieved_chunks }} chunks</span>
+    </div>
+  </div>
+
+  <!-- Query Display -->
+  <div style="padding: var(--space-4); background-color: var(--bg-tertiary); border-radius: var(--radius-md); margin-bottom: var(--space-4);">
+    <div style="font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-2);">
+      Your Question:
+    </div>
+    <div style="font-weight: 500; color: var(--text-primary);">
+      {{ query }}
+    </div>
+  </div>
+
+  <!-- Answer -->
+  {% if result.answer %}
+  <div class="result-content">
+    <h3 style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-3); color: var(--text-primary);">
+      💡 Answer
+    </h3>
+    <div style="padding: var(--space-4); background-color: var(--bg-secondary); border-left: 4px solid var(--color-success); border-radius: var(--radius-md);">
+      {{ result.answer }}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Sources -->
+  {% if result.sources %}
+  <div style="margin-top: var(--space-6);">
+    <h3 style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-4); color: var(--text-primary);">
+      📖 Sources (Top {{ result.sources|length }})
+    </h3>
+
+    <div style="display: flex; flex-direction: column; gap: var(--space-3);">
+      {% for source in result.sources %}
+      <div class="source-item" style="padding: var(--space-4); background-color: var(--bg-secondary); border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+        <div style="display: flex; align-items: start; gap: var(--space-3);">
+          <!-- Source Number Badge -->
+          <div style="flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%; background-color: var(--color-primary); color: white; display: flex; align-items: center; justify-content: center; font-weight: 600;">
+            {{ loop.index }}
+          </div>
+
+          <div style="flex: 1;">
+            <!-- Relevance Score -->
+            <div style="display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2);">
+              <span class="badge {% if source.score >= 0.8 %}badge-success{% elif source.score >= 0.6 %}badge-warning{% else %}badge-secondary{% endif %}">
+                Relevance: {{ (source.score * 100) | int }}%
+              </span>
+
+              {% if source.metadata and source.metadata.file_name %}
+              <span style="font-size: var(--text-sm); color: var(--text-secondary);">
+                📄 {{ source.metadata.file_name }}
+              </span>
+              {% endif %}
+
+              {% if source.metadata and source.metadata.page_num %}
+              <span style="font-size: var(--text-sm); color: var(--text-secondary);">
+                Page {{ source.metadata.page_num }}
+              </span>
+              {% endif %}
+            </div>
+
+            <!-- Text Preview -->
+            <div style="padding: var(--space-3); background-color: var(--bg-tertiary); border-radius: var(--radius-sm); font-size: var(--text-sm); line-height: 1.6; color: var(--text-secondary);">
+              {{ source.text }}
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if result.retrieved_chunks == 0 %}
+  <div style="padding: var(--space-6); text-align: center; color: var(--text-secondary);">
+    <div style="font-size: var(--text-4xl); margin-bottom: var(--space-3);">🔍</div>
+    <div style="font-size: var(--text-lg);">No relevant information found</div>
+    <div style="font-size: var(--text-sm); margin-top: var(--space-2);">
+      Try uploading more documents or rephrasing your question.
+    </div>
+  </div>
+  {% endif %}
+</div>

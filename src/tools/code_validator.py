@@ -242,6 +242,15 @@ class CodeValidator:
                             f"Dangerous attribute access via {node.func.id}(): '{attr_name}'"
                         )
 
+            # Special check for vars() with dangerous targets
+            if node.func.id == 'vars':
+                if len(node.args) >= 1 and isinstance(node.args[0], ast.Name):
+                    target_name = node.args[0].id
+                    if target_name in ('__builtins__', '__globals__'):
+                        self.errors.append(
+                            f"Dangerous vars() call with '{target_name}'"
+                        )
+
         # Call through getattr: getattr(__builtins__, 'eval')
         elif isinstance(node.func, ast.Attribute):
             if node.func.attr in self.DANGEROUS_BUILTINS:

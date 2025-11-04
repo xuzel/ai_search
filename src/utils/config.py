@@ -64,6 +64,18 @@ class CodeExecutionConfig(BaseModel):
     """Code Execution Configuration"""
     timeout: int = 30
     max_output_lines: int = 1000
+
+    # Security configuration (new in 2025-11-04)
+    security_level: str = "moderate"  # Options: strict, moderate, permissive
+    enable_docker: bool = True  # Use Docker sandbox if available
+    enable_validation: bool = True  # Enable AST-based code validation
+    memory_limit: str = "256m"  # Docker memory limit
+    cpu_limit: float = 1.0  # Docker CPU limit (cores)
+    enable_network: bool = False  # Enable network access in sandbox
+    python_version: str = "3.11"  # Python version for Docker
+    max_output_size: int = 100000  # Maximum output size in bytes
+
+    # Legacy: Allowed imports (deprecated, now controlled by security_level)
     allowed_imports: list = Field(
         default_factory=lambda: [
             "numpy", "pandas", "scipy", "matplotlib",

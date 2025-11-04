@@ -87,8 +87,72 @@ scraper:
 
 # Code Execution Configuration
 code_execution:
+  # Execution timeout in seconds
   timeout: 30
+
+  # Maximum lines of output to display (prevents memory issues from infinite loops)
   max_output_lines: 1000
+
+  # ================================================================
+  # SECURITY CONFIGURATION (New in 2025-11-04)
+  # ================================================================
+
+  # Security level for AST-based code validation
+  # Options:
+  #   - strict: Only basic Python (no imports, math operations only)
+  #   - moderate: + safe libraries (math, datetime, json, itertools) [RECOMMENDED]
+  #   - permissive: + data science libraries (numpy, pandas, scipy, matplotlib)
+  # Default: moderate
+  security_level: moderate
+
+  # Enable Docker sandbox for isolated code execution
+  # - true: Run code in Docker containers with resource limits (RECOMMENDED)
+  # - false: Fallback to subprocess execution (less secure)
+  # Default: true
+  # Requirements: Docker installed and running
+  enable_docker: true
+
+  # Enable AST-based code validation (Layer 1 security)
+  # - true: Validate code before execution [RECOMMENDED]
+  # - false: Skip validation (UNSAFE - only for testing)
+  # Default: true
+  enable_validation: true
+
+  # Docker memory limit (only used when enable_docker=true)
+  # Examples: "128m", "256m", "512m", "1g"
+  # Default: "256m"
+  memory_limit: "256m"
+
+  # Docker CPU limit (CPU cores)
+  # Examples: 0.5, 1.0, 2.0
+  # Default: 1.0
+  cpu_limit: 1.0
+
+  # Enable network access in sandbox
+  # - false: No network access (RECOMMENDED for security)
+  # - true: Allow network (required for packages like requests)
+  # Default: false
+  enable_network: false
+
+  # Python version for Docker sandbox
+  # Options: "3.11", "3.10", "3.9", etc.
+  # Default: "3.11"
+  python_version: "3.11"
+
+  # Maximum output size in bytes (prevents memory exhaustion)
+  # Default: 100000 (100KB)
+  max_output_size: 100000
+
+  # ================================================================
+  # LEGACY: Allowed Imports (Deprecated)
+  # ================================================================
+  # NOTE: This parameter is now controlled by the 'security_level' setting above.
+  # The security_level determines which modules are allowed:
+  #   - strict: No imports allowed
+  #   - moderate: math, statistics, random, datetime, json, etc.
+  #   - permissive: moderate + numpy, pandas, scipy, matplotlib, sympy
+  #
+  # This list is kept for backward compatibility but is no longer actively used.
   allowed_imports:
     - numpy
     - pandas

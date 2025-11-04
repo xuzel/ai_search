@@ -14,6 +14,7 @@ from src.agents import ChatAgent, CodeAgent, ResearchAgent
 from src.llm import LLMManager
 from src.router import Router, TaskType
 from src.tools import CodeExecutor, ScraperTool, SearchTool
+from src.tools.code_validator import SecurityLevel
 from src.utils import get_config, get_logger
 
 logger = get_logger(__name__)
@@ -36,6 +37,10 @@ scraper_tool = ScraperTool(
 code_executor = CodeExecutor(
     timeout=config.code_execution.timeout,
     max_output_lines=config.code_execution.max_output_lines,
+    security_level=SecurityLevel(config.code_execution.security_level),
+    enable_docker=config.code_execution.enable_docker,
+    enable_validation=config.code_execution.enable_validation,
+    memory_limit=config.code_execution.memory_limit,
 )
 
 research_agent = ResearchAgent(

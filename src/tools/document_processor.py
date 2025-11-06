@@ -1,7 +1,7 @@
 """Document Processor - Extract text from various file formats"""
 
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 import fitz as pymupdf  # PyMuPDF
 from docx import Document
@@ -18,7 +18,6 @@ class DocumentProcessor:
 
     def __init__(self):
         """Initialize Document Processor"""
-        pass
 
     def process_file(self, file_path: str) -> List[Dict[str, any]]:
         """

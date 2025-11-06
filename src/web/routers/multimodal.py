@@ -1,25 +1,20 @@
 """Multimodal Router - OCR and Vision Analysis"""
 
-import asyncio
-import logging
 from typing import Optional
-from pathlib import Path
 import json
 
 from fastapi import APIRouter, Request, UploadFile, File, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
-import markdown
-from markdown.extensions.codehilite import CodeHiliteExtension
-from markdown.extensions.fenced_code import FencedCodeExtension
-from markdown.extensions.tables import TableExtension
 
-from src.utils import get_config
+from src.utils import get_config, get_logger
 from src.llm import LLMManager
 from src.tools import OCRTool, VisionTool
 from src.web import database
 from src.web.upload_manager import UploadManager
+from src.web.dependencies.formatters import convert_markdown_to_html
+from src.web.middleware import limiter, get_limit
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 router = APIRouter()
 
@@ -98,6 +93,7 @@ async def multimodal_page(request: Request):
 
 
 @router.post("/multimodal/ocr", response_class=HTMLResponse)
+@limiter.limit(get_limit("upload"))  # 10 requests/minute
 async def extract_text_ocr(
     request: Request,
     file: UploadFile = File(...),
@@ -147,16 +143,6 @@ async def extract_text_ocr(
             "raw_lines": ocr_result.get("lines", []),
         }
 
-        # Convert analysis to markdown
-        md = markdown.Markdown(
-            extensions=[
-                FencedCodeExtension(),
-                CodeHiliteExtension(),
-                TableExtension(),
-                "nl2br",
-            ]
-        )
-
         # Create formatted markdown output
         markdown_output = f"""# OCR结果 (OCR Result)
 
@@ -189,7 +175,7 @@ async def extract_text_ocr(
             )
 
         # Render markdown to HTML
-        result["markdown"] = md.convert(markdown_output)
+        result["markdown"] = convert_markdown_to_html(markdown_output)
 
         # Save to conversation history
         await database.save_conversation(
@@ -231,6 +217,7 @@ async def extract_text_ocr(
 
 
 @router.post("/multimodal/vision", response_class=HTMLResponse)
+@limiter.limit(get_limit("upload"))  # 10 requests/minute
 async def analyze_image_vision(
     request: Request,
     file: UploadFile = File(...),
@@ -281,16 +268,6 @@ async def analyze_image_vision(
             "query": query or "General image analysis",
         }
 
-        # Convert analysis to markdown
-        md = markdown.Markdown(
-            extensions=[
-                FencedCodeExtension(),
-                CodeHiliteExtension(),
-                TableExtension(),
-                "nl2br",
-            ]
-        )
-
         # Create formatted markdown output
         markdown_output = f"""# 图像分析结果 (Image Analysis)
 
@@ -324,7 +301,7 @@ async def analyze_image_vision(
 """
 
         # Render markdown to HTML
-        result["markdown"] = md.convert(markdown_output)
+        result["markdown"] = convert_markdown_to_html(markdown_output)
 
         # Save to conversation history
         await database.save_conversation(

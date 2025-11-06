@@ -1,12 +1,109 @@
-"""Database module for storing conversation history"""
+"""Database module for storing conversation history
+
+Implements connection pooling for better performance.
+"""
 
 import aiosqlite
+import asyncio
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any, Optional
+from contextlib import asynccontextmanager
 
 # Database path
 DB_PATH = Path(__file__).parent.parent.parent / "data" / "history.db"
+
+# Connection pool
+_db_pool: Optional['DatabasePool'] = None
+
+
+class DatabasePool:
+    """Simple database connection pool for aiosqlite
+
+    Since aiosqlite doesn't have built-in pooling, we implement
+    a simple pool that reuses connections across requests.
+    """
+
+    def __init__(self, db_path: Path, pool_size: int = 5):
+        """Initialize connection pool
+
+        Args:
+            db_path: Path to SQLite database file
+            pool_size: Maximum number of connections in pool
+        """
+        self.db_path = db_path
+        self.pool_size = pool_size
+        self._pool: asyncio.Queue = asyncio.Queue(maxsize=pool_size)
+        self._created_connections = 0
+        self._lock = asyncio.Lock()
+
+    async def _create_connection(self) -> aiosqlite.Connection:
+        """Create a new database connection"""
+        conn = await aiosqlite.connect(self.db_path)
+        # Enable WAL mode for better concurrent performance
+        await conn.execute("PRAGMA journal_mode=WAL")
+        # Set reasonable timeout
+        await conn.execute("PRAGMA busy_timeout=5000")
+        return conn
+
+    @asynccontextmanager
+    async def acquire(self):
+        """Acquire a connection from the pool
+
+        Usage:
+            async with pool.acquire() as db:
+                await db.execute(...)
+        """
+        conn = None
+
+        # Try to get existing connection from pool
+        try:
+            conn = self._pool.get_nowait()
+        except asyncio.QueueEmpty:
+            # Pool is empty, create new connection if under limit
+            async with self._lock:
+                if self._created_connections < self.pool_size:
+                    conn = await self._create_connection()
+                    self._created_connections += 1
+                else:
+                    # Wait for available connection
+                    conn = await self._pool.get()
+
+        try:
+            yield conn
+        finally:
+            # Return connection to pool
+            try:
+                self._pool.put_nowait(conn)
+            except asyncio.QueueFull:
+                # Pool is full, close this connection
+                await conn.close()
+
+    async def close_all(self):
+        """Close all connections in the pool"""
+        while not self._pool.empty():
+            try:
+                conn = self._pool.get_nowait()
+                await conn.close()
+            except asyncio.QueueEmpty:
+                break
+        self._created_connections = 0
+
+
+def get_db_pool() -> DatabasePool:
+    """Get or create the global database pool"""
+    global _db_pool
+    if _db_pool is None:
+        _db_pool = DatabasePool(DB_PATH, pool_size=5)
+    return _db_pool
+
+
+async def close_db_pool():
+    """Close the global database pool"""
+    global _db_pool
+    if _db_pool is not None:
+        await _db_pool.close_all()
+        _db_pool = None
 
 
 async def init_db():
@@ -15,7 +112,8 @@ async def init_db():
     # Ensure data directory exists
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-    async with aiosqlite.connect(DB_PATH) as db:
+    pool = get_db_pool()
+    async with pool.acquire() as db:
         # Conversation history table
         await db.execute("""
             CREATE TABLE IF NOT EXISTS conversation_history (
@@ -91,7 +189,8 @@ async def save_conversation(
 
     timestamp = datetime.now().isoformat()
 
-    async with aiosqlite.connect(DB_PATH) as db:
+    pool = get_db_pool()
+    async with pool.acquire() as db:
         cursor = await db.execute(
             """
             INSERT INTO conversation_history
@@ -115,7 +214,8 @@ async def get_recent_conversations(limit: int = 50) -> List[Dict[str, Any]]:
         List of conversation dictionaries
     """
 
-    async with aiosqlite.connect(DB_PATH) as db:
+    pool = get_db_pool()
+    async with pool.acquire() as db:
         db.row_factory = aiosqlite.Row
         cursor = await db.execute(
             """
@@ -141,7 +241,8 @@ async def get_conversation_by_id(conversation_id: int) -> Optional[Dict[str, Any
         Conversation dictionary or None if not found
     """
 
-    async with aiosqlite.connect(DB_PATH) as db:
+    pool = get_db_pool()
+    async with pool.acquire() as db:
         db.row_factory = aiosqlite.Row
         cursor = await db.execute(
             """
@@ -172,7 +273,8 @@ async def search_conversations(
         List of matching conversation dictionaries
     """
 
-    async with aiosqlite.connect(DB_PATH) as db:
+    pool = get_db_pool()
+    async with pool.acquire() as db:
         db.row_factory = aiosqlite.Row
 
         if mode:
@@ -213,7 +315,8 @@ async def delete_conversation(conversation_id: int) -> bool:
         True if deleted, False if not found
     """
 
-    async with aiosqlite.connect(DB_PATH) as db:
+    pool = get_db_pool()
+    async with pool.acquire() as db:
         cursor = await db.execute(
             "DELETE FROM conversation_history WHERE id = ?",
             (conversation_id,)
@@ -230,7 +333,8 @@ async def clear_all_history() -> int:
         Number of deleted conversations
     """
 
-    async with aiosqlite.connect(DB_PATH) as db:
+    pool = get_db_pool()
+    async with pool.acquire() as db:
         cursor = await db.execute("DELETE FROM conversation_history")
         await db.commit()
         return cursor.rowcount
@@ -244,7 +348,8 @@ async def get_statistics() -> Dict[str, Any]:
         Dictionary with statistics
     """
 
-    async with aiosqlite.connect(DB_PATH) as db:
+    pool = get_db_pool()
+    async with pool.acquire() as db:
         # Total conversations
         cursor = await db.execute("SELECT COUNT(*) FROM conversation_history")
         total = (await cursor.fetchone())[0]
@@ -286,7 +391,8 @@ async def save_rag_document(
 
     timestamp = datetime.now().isoformat()
 
-    async with aiosqlite.connect(DB_PATH) as db:
+    pool = get_db_pool()
+    async with pool.acquire() as db:
         cursor = await db.execute(
             """
             INSERT INTO rag_documents
@@ -321,7 +427,8 @@ async def update_rag_document_status(
     """
     import json
 
-    async with aiosqlite.connect(DB_PATH) as db:
+    pool = get_db_pool()
+    async with pool.acquire() as db:
         if num_chunks is not None and vector_store_ids is not None:
             cursor = await db.execute(
                 """
@@ -365,7 +472,8 @@ async def update_rag_document(
     """
     import json
 
-    async with aiosqlite.connect(DB_PATH) as db:
+    pool = get_db_pool()
+    async with pool.acquire() as db:
         updates = []
         values = []
 
@@ -395,7 +503,8 @@ async def update_rag_document(
 async def get_rag_documents(limit: int = 100) -> List[Dict[str, Any]]:
     """Get all RAG documents"""
 
-    async with aiosqlite.connect(DB_PATH) as db:
+    pool = get_db_pool()
+    async with pool.acquire() as db:
         db.row_factory = aiosqlite.Row
         cursor = await db.execute(
             """
@@ -413,7 +522,8 @@ async def get_rag_documents(limit: int = 100) -> List[Dict[str, Any]]:
 async def get_rag_document_by_id(doc_id: int) -> Optional[Dict[str, Any]]:
     """Get RAG document by ID"""
 
-    async with aiosqlite.connect(DB_PATH) as db:
+    pool = get_db_pool()
+    async with pool.acquire() as db:
         db.row_factory = aiosqlite.Row
         cursor = await db.execute(
             "SELECT * FROM rag_documents WHERE id = ?",
@@ -426,7 +536,8 @@ async def get_rag_document_by_id(doc_id: int) -> Optional[Dict[str, Any]]:
 async def delete_rag_document(doc_id: int) -> bool:
     """Delete RAG document from database"""
 
-    async with aiosqlite.connect(DB_PATH) as db:
+    pool = get_db_pool()
+    async with pool.acquire() as db:
         cursor = await db.execute(
             "DELETE FROM rag_documents WHERE id = ?",
             (doc_id,)
@@ -438,7 +549,8 @@ async def delete_rag_document(doc_id: int) -> bool:
 async def get_rag_statistics() -> Dict[str, Any]:
     """Get RAG document statistics"""
 
-    async with aiosqlite.connect(DB_PATH) as db:
+    pool = get_db_pool()
+    async with pool.acquire() as db:
         # Total documents
         cursor = await db.execute("SELECT COUNT(*) FROM rag_documents")
         total = (await cursor.fetchone())[0]

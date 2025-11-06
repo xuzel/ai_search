@@ -122,7 +122,13 @@ async def test_router():
     print("=" * 60)
 
     try:
-        from src.router import Router, TaskType
+        from src.routing import create_router, TaskType
+        from src.utils import get_config
+        from src.llm import LLMManager
+
+        config = get_config()
+        llm_manager = LLMManager(config=config)
+        router = create_router(config, llm_manager, router_type='keyword')
 
         test_cases = [
             ("今天北京天气怎么样", TaskType.DOMAIN_WEATHER),
@@ -137,8 +143,9 @@ async def test_router():
         all_correct = True
 
         for query, expected_type in test_cases:
-            result = Router.classify(query)
-            confidence = Router.get_confidence(query, result)
+            decision = await router.route(query)
+            result = decision.primary_task_type
+            confidence = decision.task_confidence
 
             status = "✓" if result == expected_type else "❌"
             print(f"{status} '{query}' -> {result.value} (置信度: {confidence:.2f})")

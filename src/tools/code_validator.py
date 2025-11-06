@@ -13,7 +13,7 @@ Example bypasses that string matching misses:
 
 import ast
 from dataclasses import dataclass
-from typing import List, Set, Tuple, Optional
+from typing import List, Optional
 from enum import Enum
 
 from src.utils.logger import get_logger

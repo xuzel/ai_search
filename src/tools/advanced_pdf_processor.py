@@ -11,10 +11,9 @@ Automatically detects the best strategy for each page.
 
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import fitz as pymupdf
-from PIL import Image
 
 from src.utils.logger import get_logger
 
@@ -111,7 +110,7 @@ class AdvancedPDFProcessor:
                 bbox = page.get_image_bbox(img[7] if len(img) > 7 else xref)
                 if bbox:
                     image_area += bbox.width * bbox.height
-            except:
+            except Exception:
                 pass
 
         image_ratio = image_area / page_area if page_area > 0 else 0

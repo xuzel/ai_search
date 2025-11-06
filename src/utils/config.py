@@ -1,8 +1,7 @@
 """Configuration management for AI Search Engine"""
 
 import os
-from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 import yaml
 from dotenv import load_dotenv

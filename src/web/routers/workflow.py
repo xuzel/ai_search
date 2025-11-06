@@ -5,23 +5,20 @@ import json
 from typing import Dict, Optional
 from fastapi import APIRouter, Request, Form, WebSocket
 from fastapi.responses import HTMLResponse
-import logging
 import uuid
 
 from src.workflow import WorkflowEngine, TaskDecomposer, ResultAggregator
 from src.llm import LLMManager
 from src.agents import ResearchAgent, CodeAgent, ChatAgent
 from src.tools import SearchTool, CodeExecutor, ScraperTool
-from src.utils import get_config
+from src.utils import get_config, get_logger
 from src.web import database
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 router = APIRouter()
 
 # Global instances (initialized once)
-config = None
-llm_manager = None
 workflow_engine = None
 task_decomposer = None
 result_aggregator = None
@@ -79,7 +76,7 @@ async def plan_workflow(request: Request, query: str = Form(...)):
     """
     await initialize_workflow_engine()
 
-    templates = request.app.state.templates
+    request.app.state.templates
 
     try:
         logger.info(f"Planning workflow for query: {query}")
@@ -175,7 +172,7 @@ async def execute_workflow(request: Request, query: str = Form(...), plan: Optio
     """
     await initialize_workflow_engine()
 
-    templates = request.app.state.templates
+    request.app.state.templates
     workflow_id = str(uuid.uuid4())[:8]
 
     try:
@@ -366,7 +363,7 @@ async def websocket_workflow_progress(websocket: WebSocket, workflow_id: str):
         logger.error(f"WebSocket error for workflow {workflow_id}: {e}")
         try:
             await websocket.send_json({"error": str(e)})
-        except:
+        except Exception:
             pass
     finally:
         # Cleanup after 1 hour

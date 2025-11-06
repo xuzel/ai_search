@@ -1,7 +1,7 @@
 """Research Agent - Conducts web research and synthesizes information"""
 
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from src.llm.manager import LLMManager
 from src.tools.scraper import ScraperTool

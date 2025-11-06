@@ -33,7 +33,7 @@ from typing import Dict, Optional
 from enum import Enum
 
 from src.utils.logger import get_logger
-from src.tools.code_validator import CodeValidator, SecurityLevel, validate_code
+from src.tools.code_validator import CodeValidator, SecurityLevel
 from src.tools.sandbox_executor import (
     SandboxExecutor,
     SandboxConfig,
@@ -326,7 +326,6 @@ class CodeExecutor:
 # Backward compatibility: Keep old class name as alias
 class SafeCodeExecutor(CodeExecutor):
     """Alias for CodeExecutor (backward compatibility)"""
-    pass
 
 
 # Convenience function for quick execution

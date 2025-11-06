@@ -1,6 +1,6 @@
 """Chat Agent - General conversation agent"""
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from src.llm.manager import LLMManager
 from src.utils.logger import get_logger

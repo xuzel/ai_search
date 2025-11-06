@@ -1,7 +1,6 @@
 """Code Agent - Generates and executes code for solving problems"""
 
-import json
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from src.llm.manager import LLMManager
 from src.tools.code_executor import CodeExecutor

@@ -1,11 +1,20 @@
-"""File Upload Manager for Web UI"""
+"""File Upload Manager for Web UI
+
+Security Features:
+- File type validation (whitelist)
+- Size limits
+- Filename sanitization
+- Duplicate detection (hash-based)
+- Path traversal protection
+- Automatic cleanup
+"""
 
 import os
+import stat
 import hashlib
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
-import shutil
 
 from fastapi import UploadFile
 from PIL import Image
@@ -14,9 +23,12 @@ from src.utils import get_logger
 
 logger = get_logger(__name__)
 
+# Security: Dangerous filename patterns
+DANGEROUS_PATTERNS = ['..', '\x00', '\n', '\r']
+
 
 class UploadManager:
-    """Manages file uploads for documents and images"""
+    """Manages file uploads for documents and images with security"""
 
     def __init__(self, base_upload_dir: str = "src/web/uploads"):
         self.base_upload_dir = Path(base_upload_dir)
@@ -28,23 +40,66 @@ class UploadManager:
         for directory in [self.documents_dir, self.images_dir, self.temp_dir]:
             directory.mkdir(parents=True, exist_ok=True)
 
+    @staticmethod
+    def _is_safe_filename(filename: str) -> bool:
+        """Check if filename is safe (no path traversal or special chars)
+
+        Args:
+            filename: Original filename
+
+        Returns:
+            True if safe, False otherwise
+        """
+        # Check for dangerous patterns
+        for pattern in DANGEROUS_PATTERNS:
+            if pattern in filename:
+                logger.warning(f"Dangerous pattern '{pattern}' detected in filename: {filename}")
+                return False
+
+        # Check for absolute paths
+        if os.path.isabs(filename):
+            logger.warning(f"Absolute path detected in filename: {filename}")
+            return False
+
+        return True
+
+    @staticmethod
+    def _set_secure_permissions(file_path: Path) -> None:
+        """Set secure file permissions (read/write for owner, read for group)
+
+        Args:
+            file_path: Path to file
+        """
+        try:
+            # Set permissions to 640 (rw-r-----)
+            os.chmod(file_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP)
+            logger.debug(f"Set secure permissions for: {file_path}")
+        except Exception as e:
+            logger.warning(f"Could not set file permissions: {e}")
+
     async def save_document(self, file: UploadFile) -> dict:
         """
-        Save uploaded document
+        Save uploaded document with security checks
 
         Returns:
             dict with file info including path, size, hash, etc.
         """
         try:
+            # Security: Check filename safety
+            if not self._is_safe_filename(file.filename):
+                raise ValueError(f"Unsafe filename detected: {file.filename}")
+
             # Generate unique filename
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             file_hash = hashlib.md5(await file.read()).hexdigest()[:8]
             await file.seek(0)  # Reset file pointer
 
-            # Keep original extension
+            # Keep original extension (sanitized)
             original_name = file.filename
-            extension = Path(original_name).suffix
-            safe_filename = f"{timestamp}_{file_hash}_{Path(original_name).stem}{extension}"
+            extension = Path(original_name).suffix.lower()  # Normalize to lowercase
+            # Only use the stem (no directory components)
+            safe_stem = Path(original_name).stem.replace(' ', '_')[:100]  # Limit length
+            safe_filename = f"{timestamp}_{file_hash}_{safe_stem}{extension}"
 
             # Save to dated subfolder
             date_folder = self.documents_dir / datetime.now().strftime("%Y-%m")
@@ -58,6 +113,9 @@ class UploadManager:
                 f.write(content)
 
             file_size = len(content)
+
+            # Security: Set restrictive permissions
+            self._set_secure_permissions(file_path)
 
             logger.info(f"Saved document: {file_path} ({file_size} bytes)")
 
@@ -78,18 +136,22 @@ class UploadManager:
 
     async def save_image(self, file: UploadFile, create_thumbnail: bool = True) -> dict:
         """
-        Save uploaded image with optional thumbnail
+        Save uploaded image with optional thumbnail and security checks
 
         Returns:
             dict with image info including path, dimensions, thumbnail, etc.
         """
         try:
+            # Security: Check filename safety
+            if not self._is_safe_filename(file.filename):
+                raise ValueError(f"Unsafe filename detected: {file.filename}")
+
             # Generate unique filename
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             file_hash = hashlib.md5(await file.read()).hexdigest()[:8]
             await file.seek(0)
 
-            # Keep original extension
+            # Keep original extension (sanitized)
             original_name = file.filename
             extension = Path(original_name).suffix.lower()
 
@@ -98,7 +160,9 @@ class UploadManager:
             if extension not in valid_extensions:
                 raise ValueError(f"Invalid image extension: {extension}")
 
-            safe_filename = f"{timestamp}_{file_hash}_{Path(original_name).stem}{extension}"
+            # Sanitize stem
+            safe_stem = Path(original_name).stem.replace(' ', '_')[:100]  # Limit length
+            safe_filename = f"{timestamp}_{file_hash}_{safe_stem}{extension}"
 
             # Save to dated subfolder
             date_folder = self.images_dir / datetime.now().strftime("%Y-%m")
@@ -113,7 +177,10 @@ class UploadManager:
 
             file_size = len(content)
 
-            # Get image dimensions
+            # Security: Set restrictive permissions
+            self._set_secure_permissions(file_path)
+
+            # Get image dimensions (also validates it's a real image)
             with Image.open(file_path) as img:
                 width, height = img.size
 

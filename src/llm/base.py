@@ -30,12 +30,10 @@ class BaseLLM(ABC):
         Returns:
             Generated text response
         """
-        pass
 
     @abstractmethod
     async def is_available(self) -> bool:
         """Check if the LLM provider is available"""
-        pass
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}: {self.name}>"

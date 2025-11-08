@@ -1,6 +1,5 @@
 """Chat mode router with streaming support"""
 
-import json
 import asyncio
 from typing import AsyncGenerator
 from fastapi import APIRouter, Request, Form

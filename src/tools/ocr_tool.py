@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from paddleocr import PaddleOCR
-from PIL import Image
 
 from src.utils.logger import get_logger
 

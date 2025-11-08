@@ -1,23 +1,17 @@
 """Domain Tools Router - Weather, Finance, Routing"""
 
-import asyncio
-import logging
-from typing import Optional
 import json
 
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
-import markdown
-from markdown.extensions.codehilite import CodeHiliteExtension
-from markdown.extensions.fenced_code import FencedCodeExtension
-from markdown.extensions.tables import TableExtension
 
-from src.utils import get_config
+from src.utils import get_config, get_logger
 from src.llm import LLMManager
 from src.tools import WeatherTool, FinanceTool, RoutingTool
 from src.web import database
+from src.web.dependencies.formatters import convert_markdown_to_html
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 router = APIRouter()
 
@@ -148,16 +142,6 @@ async def get_weather(
             "forecast": weather_result.get("forecast", []),
         }
 
-        # Convert to markdown
-        md = markdown.Markdown(
-            extensions=[
-                FencedCodeExtension(),
-                CodeHiliteExtension(),
-                TableExtension(),
-                "nl2br",
-            ]
-        )
-
         # Create formatted markdown output
         markdown_output = f"""# 天气信息 (Weather Information)
 
@@ -184,7 +168,7 @@ async def get_weather(
             for day in result["forecast"][:7]:
                 markdown_output += f"| {day.get('date', 'N/A')} | {day.get('condition', 'N/A')} | {day.get('high', 'N/A')} | {day.get('low', 'N/A')} |\n"
 
-        result["markdown"] = md.convert(markdown_output)
+        result["markdown"] = convert_markdown_to_html(markdown_output)
 
         # Save to conversation history
         await database.save_conversation(
@@ -262,16 +246,6 @@ async def get_stock_data(
             "avg_volume": stock_result.get("avg_volume", "N/A"),
         }
 
-        # Convert to markdown
-        md = markdown.Markdown(
-            extensions=[
-                FencedCodeExtension(),
-                CodeHiliteExtension(),
-                TableExtension(),
-                "nl2br",
-            ]
-        )
-
         # Create formatted markdown output
         change_emoji = "📈" if float(str(result["change_percent"]).replace("%", "")) > 0 else "📉"
         markdown_output = f"""# 股票数据 (Stock Data)
@@ -304,7 +278,7 @@ async def get_stock_data(
 
 """
 
-        result["markdown"] = md.convert(markdown_output)
+        result["markdown"] = convert_markdown_to_html(markdown_output)
 
         # Save to conversation history
         await database.save_conversation(
@@ -382,16 +356,6 @@ async def get_route(
             "steps": route_result.get("steps", []),
         }
 
-        # Convert to markdown
-        md = markdown.Markdown(
-            extensions=[
-                FencedCodeExtension(),
-                CodeHiliteExtension(),
-                TableExtension(),
-                "nl2br",
-            ]
-        )
-
         # Create formatted markdown output
         mode_emoji = {"driving": "🚗", "walking": "🚶", "cycling": "🚴", "foot-walking": "🚶"}.get(mode, "🛣️")
         markdown_output = f"""# 路线规划 (Route Information)
@@ -421,7 +385,7 @@ async def get_route(
             if len(result["steps"]) > 10:
                 markdown_output += f"\n... 还有 {len(result['steps']) - 10} 步 ...\n"
 
-        result["markdown"] = md.convert(markdown_output)
+        result["markdown"] = convert_markdown_to_html(markdown_output)
 
         # Save to conversation history
         await database.save_conversation(

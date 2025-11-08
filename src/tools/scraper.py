@@ -1,10 +1,9 @@
 """Web Scraper Tool"""
 
 import asyncio
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 import aiohttp
-import requests
 from tenacity import retry, stop_after_attempt, wait_exponential
 from trafilatura import extract
 

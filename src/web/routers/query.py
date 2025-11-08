@@ -1,232 +1,444 @@
-"""Unified Query Router - Auto-classify and route queries"""
+"""Unified Query Router - Refactored with Dependency Injection
 
-import asyncio
-from fastapi import APIRouter, Request, Form
+This is the refactored version of query.py with:
+- No global variables
+- Dependency injection
+- Smaller, focused functions
+- Better separation of concerns
+"""
+
+import json
+from typing import Dict, Any, Optional
+from fastapi import APIRouter, Request, Form, Depends
 from fastapi.responses import HTMLResponse
-import logging
 import markdown
-from markdown.extensions.codehilite import CodeHiliteExtension
-from markdown.extensions.fenced_code import FencedCodeExtension
-from markdown.extensions.tables import TableExtension
 
-from src.router import Router, TaskType
-from src.cn_llm_router import ChineseIntelligentRouter, RoutingDecision
-from src.llm import LLMManager
+# Use new unified routing system
+from src.routing import BaseRouter, RoutingDecision, TaskType
 from src.agents import ResearchAgent, CodeAgent, ChatAgent
-from src.tools import SearchTool, CodeExecutor, ScraperTool, HybridReranker, Reranker, CredibilityScorer, WeatherTool, FinanceTool, RoutingTool
-from src.utils import get_config
+from src.tools import WeatherTool, FinanceTool, RoutingTool, CredibilityScorer
 from src.web import database
+from src.web.middleware import limiter, get_limit
+from src.web.dependencies import (
+    get_router,
+    get_research_agent,
+    get_code_agent,
+    get_chat_agent,
+    get_weather_tool,
+    get_finance_tool,
+    get_routing_tool,
+    get_credibility_scorer,
+    get_markdown_processor,
+    convert_markdown_to_html,
+)
+from src.utils.logger import get_logger
+from src.utils import extract_location, extract_stock_symbol, extract_route
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 router = APIRouter()
 
-# Global instances (initialized once)
-config = None
-llm_manager = None
-llm_router = None  # NEW: LLM-based intelligent router
-research_agent = None
-code_agent = None
-chat_agent = None
-reranker = None
-credibility_scorer = None
-weather_tool = None
-finance_tool = None
-routing_tool = None
+
+# ============================================
+# Task Execution Functions (Separated)
+# ============================================
+
+async def execute_research_task(
+    query: str,
+    research_agent: ResearchAgent
+) -> Dict[str, Any]:
+    """Execute research task
+
+    Args:
+        query: User query
+        research_agent: Research agent instance
+
+    Returns:
+        Research result dictionary
+    """
+    logger.info(f"Executing research task: {query}")
+    result = await research_agent.research(query, show_progress=False)
+    return result
 
 
-async def initialize_agents():
-    """Initialize all agents and tools"""
-    global config, llm_manager, llm_router, research_agent, code_agent, chat_agent, reranker, credibility_scorer, weather_tool, finance_tool, routing_tool
+async def execute_code_task(
+    query: str,
+    code_agent: CodeAgent
+) -> Dict[str, Any]:
+    """Execute code generation and execution task
 
-    if llm_manager is None:
-        config = get_config()
-        llm_manager = LLMManager(config=config)
+    Args:
+        query: User query
+        code_agent: Code agent instance
 
-        # Initialize router (no constructor arguments needed)
-        query_router = Router()
+    Returns:
+        Code execution result dictionary
+    """
+    logger.info(f"Executing code task: {query}")
+    result = await code_agent.solve(query)
+    return result
 
-        # Initialize LLM-based intelligent router (NEW)
-        llm_router = ChineseIntelligentRouter(llm_manager)
-        logger.info("ChineseIntelligentRouter initialized (LLM-based routing)")
 
-        # Initialize tools
-        search_tool = SearchTool(api_key=config.search.serpapi_key)
-        scraper_tool = ScraperTool()
-        code_executor = CodeExecutor(
-            timeout=config.code_execution.timeout,
-            max_output_lines=config.code_execution.max_output_lines
+async def execute_chat_task(
+    query: str,
+    chat_agent: ChatAgent
+) -> Dict[str, Any]:
+    """Execute chat task
+
+    Args:
+        query: User query
+        chat_agent: Chat agent instance
+
+    Returns:
+        Chat response dictionary
+    """
+    logger.info(f"Executing chat task: {query}")
+    result = await chat_agent.chat(query)
+    return result
+
+
+async def execute_weather_task(
+    query: str,
+    weather_tool: Optional[WeatherTool]
+) -> Dict[str, Any]:
+    """Execute weather query task
+
+    Args:
+        query: User query
+        weather_tool: Weather tool instance
+
+    Returns:
+        Weather result dictionary
+    """
+    if weather_tool is None:
+        return {
+            "error": "Weather tool not enabled. Please configure OPENWEATHERMAP_API_KEY."
+        }
+
+    logger.info(f"Executing weather task: {query}")
+
+    # Extract location from query using entity extractor
+    location = extract_location(query)
+    logger.debug(f"Extracted location: {location}")
+
+    result = await weather_tool.get_weather(location)
+    return {
+        "location": location,
+        "weather_data": result,
+        "summary": _format_weather_summary(result)
+    }
+
+
+async def execute_finance_task(
+    query: str,
+    finance_tool: Optional[FinanceTool]
+) -> Dict[str, Any]:
+    """Execute finance query task
+
+    Args:
+        query: User query
+        finance_tool: Finance tool instance
+
+    Returns:
+        Finance result dictionary
+    """
+    if finance_tool is None:
+        return {
+            "error": "Finance tool not enabled. Please configure ALPHA_VANTAGE_API_KEY."
+        }
+
+    logger.info(f"Executing finance task: {query}")
+
+    # Extract stock symbol from query using entity extractor
+    symbol = extract_stock_symbol(query)
+    logger.debug(f"Extracted stock symbol: {symbol}")
+
+    result = await finance_tool.get_stock_quote(symbol)
+    return {
+        "symbol": symbol,
+        "stock_data": result,
+        "summary": _format_finance_summary(result)
+    }
+
+
+async def execute_routing_task(
+    query: str,
+    routing_tool: Optional[RoutingTool]
+) -> Dict[str, Any]:
+    """Execute routing/navigation task
+
+    Args:
+        query: User query
+        routing_tool: Routing tool instance
+
+    Returns:
+        Routing result dictionary
+    """
+    if routing_tool is None:
+        return {
+            "error": "Routing tool not enabled. Please configure OPENROUTESERVICE_API_KEY."
+        }
+
+    logger.info(f"Executing routing task: {query}")
+
+    # Extract origin and destination from query using entity extractor
+    origin, destination = extract_route(query)
+    logger.debug(f"Extracted route: {origin} -> {destination}")
+
+    if not origin or not destination:
+        return {
+            "query": query,
+            "summary": "Could not extract origin and destination. Please specify 'from X to Y' format."
+        }
+
+    # Get route using routing tool
+    result = await routing_tool.get_route(
+        origin=origin,
+        destination=destination,
+        profile="driving-car"
+    )
+
+    return {
+        "origin": origin,
+        "destination": destination,
+        "route_data": result,
+        "summary": f"Route from {origin} to {destination}"
+    }
+
+
+# ============================================
+# Helper Functions
+# ============================================
+
+def _format_weather_summary(weather_data: Dict[str, Any]) -> str:
+    """Format weather data into readable summary"""
+    if "error" in weather_data:
+        return f"Error: {weather_data['error']}"
+
+    return (
+        f"Temperature: {weather_data.get('temperature', 'N/A')}°C, "
+        f"Condition: {weather_data.get('description', 'N/A')}, "
+        f"Humidity: {weather_data.get('humidity', 'N/A')}%"
+    )
+
+
+def _format_finance_summary(stock_data: Dict[str, Any]) -> str:
+    """Format stock data into readable summary"""
+    if "error" in stock_data:
+        return f"Error: {stock_data['error']}"
+
+    return (
+        f"Price: ${stock_data.get('price', 'N/A')}, "
+        f"Change: {stock_data.get('change', 'N/A')} "
+        f"({stock_data.get('change_percent', 'N/A')}%)"
+    )
+
+
+async def add_credibility_scores(
+    sources: list,
+    credibility_scorer: Optional[CredibilityScorer]
+) -> list:
+    """Add credibility scores to research sources
+
+    Args:
+        sources: List of source dictionaries
+        credibility_scorer: Credibility scorer instance
+
+    Returns:
+        Sources with credibility scores added
+    """
+    if not credibility_scorer or not sources:
+        return sources
+
+    for source in sources:
+        if source.get('url'):
+            score = credibility_scorer.score_source(
+                url=source['url'],
+                title=source.get('title', ''),
+                snippet=source.get('snippet', '')
+            )
+            source['credibility_score'] = score['overall_score']
+            source['credibility_details'] = score
+
+    return sources
+
+
+# Markdown conversion moved to src.web.dependencies.formatters
+# Kept as wrapper for backward compatibility
+def _convert_markdown(text: str, md_processor: markdown.Markdown) -> str:
+    """Convert markdown text to HTML using provided processor
+
+    Args:
+        text: Markdown text
+        md_processor: Markdown processor instance
+
+    Returns:
+        HTML string
+    """
+    return convert_markdown_to_html(text, md_processor)
+
+
+async def save_conversation_to_db(
+    mode: str,
+    query: str,
+    result: Dict[str, Any],
+    task_type: TaskType,
+    confidence: float
+) -> None:
+    """Save conversation to database
+
+    Args:
+        mode: Conversation mode (research, code, chat)
+        query: User query
+        result: Task execution result
+        task_type: Classified task type
+        confidence: Classification confidence
+    """
+    # Extract response text based on mode
+    if mode == "research":
+        response_text = str(result.get('summary', ''))
+    elif mode == "code":
+        response_text = (
+            str(result.get('explanation', '')) +
+            "\n\nOutput: " +
+            str(result.get('output', ''))
         )
+    elif mode == "chat":
+        response_text = str(result.get('message', '') or result.get('answer', ''))
+    else:
+        response_text = str(result)
 
-        # Initialize advanced tools
-        # Try HybridReranker first (stronger), fallback to Reranker
-        try:
-            reranker = HybridReranker()
-            logger.info("HybridReranker initialized (preferred)")
-        except Exception as e:
-            logger.warning(f"HybridReranker initialization failed, trying Reranker: {e}")
-            try:
-                reranker = Reranker()
-                logger.info("Reranker initialized as fallback")
-            except Exception as e2:
-                logger.warning(f"Reranker initialization failed (optional): {e2}")
-                reranker = None
+    # Save to database
+    await database.save_conversation(
+        mode=mode,
+        query=query,
+        response=response_text,
+        metadata=json.dumps({
+            "task_type": task_type.value,
+            "confidence": confidence,
+            "sources": result.get('sources', []) if isinstance(result.get('sources'), list) else []
+        })
+    )
 
-        credibility_scorer = CredibilityScorer()
 
-        # Initialize domain tools
-        try:
-            weather_tool = WeatherTool()
-            logger.info("WeatherTool initialized")
-        except Exception as e:
-            logger.warning(f"WeatherTool initialization failed (optional): {e}")
-            weather_tool = None
-
-        try:
-            finance_tool = FinanceTool()
-            logger.info("FinanceTool initialized")
-        except Exception as e:
-            logger.warning(f"FinanceTool initialization failed (optional): {e}")
-            finance_tool = None
-
-        try:
-            routing_tool = RoutingTool()
-            logger.info("RoutingTool initialized")
-        except Exception as e:
-            logger.warning(f"RoutingTool initialization failed (optional): {e}")
-            routing_tool = None
-
-        # Initialize agents
-        research_agent = ResearchAgent(
-            llm_manager=llm_manager,
-            search_tool=search_tool,
-            scraper_tool=scraper_tool,
-            config=config
-        )
-        code_agent = CodeAgent(
-            llm_manager=llm_manager,
-            code_executor=code_executor,
-            config=config
-        )
-        chat_agent = ChatAgent(llm_manager=llm_manager)
-
-        logger.info("All agents initialized successfully")
-
+# ============================================
+# Main Query Endpoint (Refactored)
+# ============================================
 
 @router.post("/query", response_class=HTMLResponse)
-async def unified_query(request: Request, query: str = Form(...)):
-    """
-    Unified query endpoint with intelligent routing
+@limiter.limit(get_limit("query"))  # 30 requests/minute
+async def unified_query(
+    request: Request,
+    query: str = Form(...),
+    # Dependency injection (no more global variables!)
+    router_instance: BaseRouter = Depends(get_router),
+    research_agent: ResearchAgent = Depends(get_research_agent),
+    code_agent: CodeAgent = Depends(get_code_agent),
+    chat_agent: ChatAgent = Depends(get_chat_agent),
+    weather_tool: Optional[WeatherTool] = Depends(get_weather_tool),
+    finance_tool: Optional[FinanceTool] = Depends(get_finance_tool),
+    routing_tool: Optional[RoutingTool] = Depends(get_routing_tool),
+    credibility_scorer: Optional[CredibilityScorer] = Depends(get_credibility_scorer),
+    md_processor: markdown.Markdown = Depends(get_markdown_processor),
+):
+    """Unified query endpoint with intelligent routing
 
     This endpoint:
-    1. Classifies the query using Router (hybrid approach)
-    2. Routes to appropriate agent
-    3. Returns unified result format
-    """
-    await initialize_agents()
+    1. Classifies the query using the unified router
+    2. Routes to appropriate task executor
+    3. Saves conversation history
+    4. Returns formatted response
 
+    Args:
+        request: FastAPI request
+        query: User query from form
+        router_instance: Router for query classification (injected)
+        research_agent: Research agent (injected)
+        code_agent: Code agent (injected)
+        chat_agent: Chat agent (injected)
+        weather_tool: Weather tool (injected, optional)
+        finance_tool: Finance tool (injected, optional)
+        routing_tool: Routing tool (injected, optional)
+        credibility_scorer: Credibility scorer (injected, optional)
+        md_processor: Markdown processor (injected)
+
+    Returns:
+        HTML response with query result
+    """
     templates = request.app.state.templates
 
     try:
-        # Step 1: Classify query using LLM-based intelligent router (NEW)
-        logger.info(f"Classifying query with LLM-based router: {query}")
-        routing_decision: RoutingDecision = await llm_router.route_query(
+        # Step 1: Classify query
+        logger.info(f"Classifying query: {query}")
+        decision: RoutingDecision = await router_instance.route(
             query=query,
             context={'language': 'zh'}  # Chinese context
         )
 
-        task_type = routing_decision.primary_task_type
-        confidence = routing_decision.task_confidence
-        reason = routing_decision.reasoning
+        task_type = decision.primary_task_type
+        confidence = decision.task_confidence
+        reasoning = decision.reasoning
 
-        logger.info(f"Classified as {task_type.value} with confidence {confidence:.2f} - {reason}")
-        logger.info(f"Tools needed: {[tool.tool_name for tool in routing_decision.tools_needed]}")
-        if routing_decision.multi_intent:
-            logger.info(f"Multi-intent query detected")
-
-        # Step 2: Route to appropriate agent
-        if task_type == TaskType.RESEARCH:
-            result = await handle_research(query)
-            mode = "research"
-        elif task_type == TaskType.CODE:
-            result = await handle_code(query)
-            mode = "code"
-        elif task_type == TaskType.CHAT:
-            result = await handle_chat(query)
-            mode = "chat"
-        elif task_type == TaskType.DOMAIN_WEATHER:
-            result = await handle_weather(query)
-            mode = "research"  # Render as research result
-        elif task_type == TaskType.DOMAIN_FINANCE:
-            result = await handle_finance(query)
-            mode = "research"  # Render as research result
-        elif task_type == TaskType.DOMAIN_ROUTING:
-            result = await handle_routing(query)
-            mode = "research"  # Render as research result
-        else:
-            # Default to research for unknown types
-            logger.warning(f"Unknown task type {task_type}, defaulting to research")
-            result = await handle_research(query)
-            mode = "research"
-
-        # Step 3: Save to history
-        import json
-        # Extract response based on mode
-        if mode == "research":
-            response_text = str(result.get('summary', ''))
-        elif mode == "code":
-            response_text = str(result.get('explanation', '')) + "\n\nOutput: " + str(result.get('output', ''))
-        elif mode == "chat":
-            response_text = str(result.get('message', '') or result.get('answer', ''))
-        else:
-            response_text = str(result)
-
-        await database.save_conversation(
-            mode=mode,
-            query=query,
-            response=response_text,
-            metadata=json.dumps({
-                "task_type": task_type.value,
-                "confidence": confidence,
-                "sources": result.get('sources', []) if isinstance(result.get('sources'), list) else []
-            })
+        logger.info(
+            f"Classification: {task_type.value} "
+            f"(confidence: {confidence:.2f}, reason: {reasoning})"
         )
 
-        # Step 4: Process result for rendering
-        # Convert markdown to HTML for text responses
-        if mode in ["research", "chat", "rag"]:
-            md = markdown.Markdown(
-                extensions=[
-                    FencedCodeExtension(),
-                    CodeHiliteExtension(),
-                    TableExtension(),
-                    'nl2br',
-                ]
-            )
+        # Step 2: Execute task based on classification
+        if task_type == TaskType.RESEARCH:
+            result = await execute_research_task(query, research_agent)
+            mode = "research"
 
-            if mode == "research" and result.get('summary'):
-                result['summary'] = md.convert(result['summary'])
+        elif task_type == TaskType.CODE:
+            result = await execute_code_task(query, code_agent)
+            mode = "code"
 
-                # Add credibility scores to sources
-                if credibility_scorer and result.get('sources'):
-                    for source in result['sources']:
-                        if source.get('url'):
-                            score = credibility_scorer.score_source(
-                                url=source['url'],
-                                title=source.get('title', ''),
-                                snippet=source.get('snippet', '')
-                            )
-                            source['credibility_score'] = score['overall_score']
-                            source['credibility_details'] = score
+        elif task_type == TaskType.CHAT:
+            result = await execute_chat_task(query, chat_agent)
+            mode = "chat"
 
-            elif mode == "chat" and result.get('message'):
-                result['message'] = md.convert(result['message'])
-            elif mode == "chat" and result.get('answer'):
-                result['answer'] = md.convert(result['answer'])
-            elif mode == "rag" and result.get('answer'):
-                result['answer'] = md.convert(result['answer'])
+        elif task_type == TaskType.DOMAIN_WEATHER:
+            result = await execute_weather_task(query, weather_tool)
+            mode = "research"  # Render as research
 
-        # Render result
+        elif task_type == TaskType.DOMAIN_FINANCE:
+            result = await execute_finance_task(query, finance_tool)
+            mode = "research"  # Render as research
+
+        elif task_type == TaskType.DOMAIN_ROUTING:
+            result = await execute_routing_task(query, routing_tool)
+            mode = "research"  # Render as research
+
+        else:
+            # Fallback to chat
+            logger.warning(f"Unknown task type {task_type}, defaulting to chat")
+            result = await execute_chat_task(query, chat_agent)
+            mode = "chat"
+
+        # Step 3: Post-process results
+        if mode == "research":
+            # Convert markdown to HTML using singleton processor
+            if result.get('summary'):
+                result['summary'] = _convert_markdown(result['summary'], md_processor)
+
+            # Add credibility scores
+            if result.get('sources'):
+                result['sources'] = await add_credibility_scores(
+                    result['sources'],
+                    credibility_scorer
+                )
+
+        elif mode == "chat":
+            # Convert markdown to HTML for chat responses using singleton processor
+            if result.get('message'):
+                result['message'] = _convert_markdown(result['message'], md_processor)
+            elif result.get('answer'):
+                result['answer'] = _convert_markdown(result['answer'], md_processor)
+
+        # Step 4: Save to database
+        await save_conversation_to_db(mode, query, result, task_type, confidence)
+
+        # Step 5: Render response
         return templates.TemplateResponse(
             f"components/result_{mode}.html",
             {
@@ -248,169 +460,3 @@ async def unified_query(request: Request, query: str = Form(...)):
                 "query": query
             }
         )
-
-
-async def handle_research(query: str) -> dict:
-    """Handle research queries"""
-    logger.info(f"Executing research for: {query}")
-    result = await research_agent.research(query)
-
-    # Apply reranking to sources if available and we have sources
-    if reranker and result.get('sources') and len(result['sources']) > 0:
-        try:
-            logger.info(f"Applying reranker to {len(result['sources'])} sources")
-            snippets = [s.get('snippet', '') for s in result['sources']]
-
-            # Only rerank if we have content
-            if any(snippets):
-                reranked = await reranker.rerank(query, snippets, top_k=min(10, len(result['sources'])))
-
-                # Reorder sources based on reranked results
-                if reranked and 'scores' in reranked:
-                    # Create a mapping of scores to sources
-                    scored_sources = []
-                    for idx, score in enumerate(reranked.get('scores', [])):
-                        if idx < len(result['sources']):
-                            source = result['sources'][idx].copy()
-                            source['rerank_score'] = score
-                            scored_sources.append(source)
-
-                    # Sort by rerank score (descending)
-                    scored_sources.sort(key=lambda x: x.get('rerank_score', 0), reverse=True)
-                    result['sources'] = scored_sources
-                    logger.info(f"Reranking completed, top source rerank score: {scored_sources[0].get('rerank_score', 0):.3f}")
-        except Exception as e:
-            logger.warning(f"Reranking failed (non-critical): {e}")
-            # Continue without reranking
-
-    return result
-
-
-async def handle_code(query: str) -> dict:
-    """Handle code generation/execution queries"""
-    logger.info(f"Executing code generation for: {query}")
-    result = await code_agent.solve(query, show_progress=False)
-    return result
-
-
-async def handle_chat(query: str) -> dict:
-    """Handle chat queries"""
-    logger.info(f"Executing chat for: {query}")
-    response = await chat_agent.chat(query)
-    return {
-        "message": response,
-        "answer": response
-    }
-
-
-async def handle_weather(query: str) -> dict:
-    """Handle weather queries"""
-    logger.info(f"Executing weather query for: {query}")
-    if not weather_tool:
-        logger.warning("WeatherTool not available")
-        return {
-            "summary": "Weather tool is not available. Please try again later.",
-            "sources": []
-        }
-
-    try:
-        result = await weather_tool.get_weather(query)
-        return {
-            "summary": result.get("summary", str(result)),
-            "sources": [{"title": "Weather Data", "snippet": result.get("summary", str(result)), "url": ""}]
-        }
-    except Exception as e:
-        logger.error(f"Weather query failed: {e}")
-        return {
-            "summary": f"Unable to fetch weather information: {str(e)}",
-            "sources": []
-        }
-
-
-async def handle_finance(query: str) -> dict:
-    """Handle finance queries"""
-    logger.info(f"Executing finance query for: {query}")
-    if not finance_tool:
-        logger.warning("FinanceTool not available")
-        return {
-            "summary": "Finance tool is not available. Please try again later.",
-            "sources": []
-        }
-
-    try:
-        result = await finance_tool.get_stock_info(query)
-        return {
-            "summary": result.get("summary", str(result)),
-            "sources": [{"title": "Stock Data", "snippet": result.get("summary", str(result)), "url": ""}]
-        }
-    except Exception as e:
-        logger.error(f"Finance query failed: {e}")
-        return {
-            "summary": f"Unable to fetch finance information: {str(e)}",
-            "sources": []
-        }
-
-
-async def handle_routing(query: str) -> dict:
-    """Handle routing queries"""
-    logger.info(f"Executing routing query for: {query}")
-    if not routing_tool:
-        logger.warning("RoutingTool not available")
-        return {
-            "summary": "Routing tool is not available. Please try again later.",
-            "sources": []
-        }
-
-    try:
-        result = await routing_tool.get_route(query)
-        return {
-            "summary": result.get("summary", str(result)),
-            "sources": [{"title": "Route Information", "snippet": result.get("summary", str(result)), "url": ""}]
-        }
-    except Exception as e:
-        logger.error(f"Routing query failed: {e}")
-        return {
-            "summary": f"Unable to fetch routing information: {str(e)}",
-            "sources": []
-        }
-
-
-@router.post("/classify", response_class=HTMLResponse)
-async def classify_query(request: Request, query: str = Form(...)):
-    """
-    Classify query without executing it
-    Used for showing the detected mode before execution
-    """
-    await initialize_agents()
-
-    templates = request.app.state.templates
-
-    try:
-        task_type, confidence, reason = await Router.classify_hybrid(query, llm_manager=llm_manager)
-
-        # Map task types to icons and labels
-        type_info = {
-            TaskType.RESEARCH: {"icon": "🔍", "label": "Research", "color": "primary"},
-            TaskType.CODE: {"icon": "💻", "label": "Code", "color": "success"},
-            TaskType.CHAT: {"icon": "💬", "label": "Chat", "color": "secondary"},
-        }
-
-        info = type_info.get(task_type, {"icon": "❓", "label": "Unknown", "color": "secondary"})
-
-        return f"""
-        <div class="search-type-indicator" id="typeIndicator">
-            <span>Detected mode:</span>
-            <span class="search-type-badge badge-{info['color']}">
-                {info['icon']} {info['label']} - {int(confidence * 100)}% confidence
-            </span>
-            <span style="margin-left: auto;">
-                <button class="btn btn-ghost btn-sm" onclick="document.getElementById('typeIndicator').style.display='none'">
-                    Change
-                </button>
-            </span>
-        </div>
-        """
-
-    except Exception as e:
-        logger.error(f"Error classifying query: {e}", exc_info=True)
-        return ""

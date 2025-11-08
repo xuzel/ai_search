@@ -1,6 +1,5 @@
 """Ollama Local Model Client"""
 
-import json
 from typing import Any, Dict, List, Optional
 
 import aiohttp

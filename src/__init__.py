@@ -3,6 +3,6 @@
 __version__ = "0.1.0"
 __author__ = "AI Search Team"
 
-from .main import main
+from .main import app
 
-__all__ = ["main"]
+__all__ = ["app"]

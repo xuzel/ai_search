@@ -10,6 +10,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.web import database
+from src.web.middleware import setup_rate_limiting
 from src.web.routers import main, search, code, chat, history, query, rag, multimodal, tools, workflow
 from src.utils import get_logger
 
@@ -23,10 +24,12 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting AI Search Engine Web UI...")
     await database.init_db()
-    logger.info("Database initialized")
+    logger.info("Database initialized (with connection pooling)")
     yield
     # Shutdown
     logger.info("Shutting down AI Search Engine Web UI...")
+    await database.close_db_pool()
+    logger.info("Database connection pool closed")
 
 
 # Create FastAPI app
@@ -37,14 +40,21 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Add CORS middleware
+# Add CORS middleware with environment-based configuration
+# Security: Use whitelist in production, wildcard only in development
+cors_origins = os.getenv("CORS_ORIGINS", "*").split(",")
+cors_origins = [origin.strip() for origin in cors_origins]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins,  # Set CORS_ORIGINS="http://localhost:3000,https://example.com" in production
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
+
+# Setup rate limiting
+setup_rate_limiting(app)
 
 # Get paths
 BASE_DIR = Path(__file__).parent

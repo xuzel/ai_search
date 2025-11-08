@@ -4,7 +4,6 @@ import asyncio
 from typing import Any, Dict, List, Optional
 
 import aiohttp
-import requests
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from src.utils.logger import get_logger

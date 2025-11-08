@@ -12,6 +12,7 @@ from src.llm import LLMManager
 from src.tools import CodeExecutor
 from src.utils import get_config, get_logger
 from src.web import database
+from src.web.middleware import limiter, get_limit
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -31,6 +32,7 @@ code_agent = CodeAgent(
 
 
 @router.post("/", response_class=HTMLResponse)
+@limiter.limit(get_limit("compute"))  # 5 requests/minute
 async def execute_code(request: Request, query: str = Form(...)):
     """
     Execute code generation and execution

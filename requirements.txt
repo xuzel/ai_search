@@ -30,9 +30,10 @@ markdown==3.5.1
 pymdown-extensions==10.5
 pygments==2.17.2
 aiosqlite==0.19.0
+slowapi==0.1.9
 
 # Async Support
-asyncio-contextmanager
+asyncio-contextmanager==1.0.1
 
 # Code Execution Safety
 # restricted-execution
@@ -45,18 +46,24 @@ tenacity==8.2.3
 pytest==7.4.3
 pytest-asyncio==0.21.1
 pytest-cov==4.1.0
+pytest-benchmark==4.0.0
+pytest-timeout==2.2.0
+psutil==5.9.6
 
 # Development
 black==23.12.0
 flake8==6.1.0
 mypy==1.7.0
+autoflake==2.3.1
+vulture==2.14
+
+# Documentation
+sphinx==7.2.6
+sphinx-rtd-theme==2.0.0
+sphinx-autodoc-typehints==1.25.2
+myst-parser==2.0.0
 
 # RAG Framework (Phase 1)
-llama-index
-llama-index-core
-llama-index-embeddings-huggingface
-langchain
-langchain-community
 
 # Vector Store
 chromadb==0.4.22
@@ -79,10 +86,10 @@ alpha-vantage==2.3.1         # Finance (primary)
 openrouteservice==2.3.3      # Routing/Transportation
 
 # Multimodal Support (Phase 4)
-paddleocr             # OCR for Chinese/English
-paddlepaddle          # PaddleOCR backend (CPU)
-google-generativeai   # Gemini vision API
-pillow               # Image processing
+paddleocr==2.10.0             # OCR for Chinese/English
+paddlepaddle==3.2.1          # PaddleOCR backend (CPU)
+google-generativeai==0.8.5   # Gemini vision API
+pillow==12.0.0               # Image processing
 
 # Optional: Reranking API
 # cohere==4.47               # Faster reranking (paid)

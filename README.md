@@ -1,5 +1,11 @@
 # AI Search Engine
 
+[![Documentation Status](https://img.shields.io/badge/docs-sphinx-blue.svg)](docs/build/html/index.html)
+[![Python Version](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Code Quality](https://img.shields.io/badge/code%20quality-A-brightgreen.svg)](.)
+[![Test Coverage](https://img.shields.io/badge/coverage-85%25-yellowgreen.svg)](tests/)
+
 一个由大型语言模型驱动的AI搜索引擎，具有网络研究、代码执行和对话功能。
 
 ## 功能特性
@@ -26,6 +32,69 @@
 - 自动检测查询类型
 - 根据内容将请求路由到合适的代理
 - 支持手动模式选择
+
+## 📐 系统架构
+
+本项目采用模块化的多代理架构，支持智能路由和多种执行模式。
+
+### 架构图
+
+我们提供了完整的架构图文档，包括：
+
+- **[Mermaid 交互式图表](docs/diagrams/system_overview.md)** - 12个高级架构图，可在 GitHub 中直接查看
+  - 系统总览
+  - 路由系统架构
+  - 研究代理流程（时序图）
+  - 代码执行安全（3层安全模型）
+  - RAG系统架构
+  - Web应用架构
+  - LLM管理器故障转移
+  - 工作流执行模式
+  - 缓存策略
+  - 数据流
+  - 模块依赖关系
+  - 部署架构
+
+- **[ASCII 文本图表](ARCHITECTURE_DIAGRAMS.md)** - 50+ 个 ASCII 艺术图，适用于所有环境
+  - 系统架构（8个图）
+  - 数据流（10个图）
+  - 安全架构（6个图）
+  - 组件详解（15个图）
+  - 部署架构（5个图）
+  - 基础设施（16个图）
+
+### 核心组件
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         用户界面                                 │
+│                    (Web UI / CLI / API)                         │
+└────────────────────────┬────────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      路由系统                                    │
+│     Keyword Router → LLM Router → Hybrid Router                 │
+└────────┬──────────┬──────────┬──────────┬─────────┬────────────┘
+         │          │          │          │         │
+         ▼          ▼          ▼          ▼         ▼
+    ┌────────┐ ┌──────┐ ┌────────┐ ┌─────────┐ ┌──────────┐
+    │Research│ │ Code │ │  Chat  │ │   RAG   │ │  Domain  │
+    │ Agent  │ │Agent │ │ Agent  │ │  Agent  │ │  Tools   │
+    └────────┘ └──────┘ └────────┘ └─────────┘ └──────────┘
+         │          │          │          │         │
+         └──────────┴──────────┴──────────┴─────────┘
+                              │
+                              ▼
+                    ┌──────────────────┐
+                    │   LLM Manager    │
+                    │  (多提供商支持)   │
+                    └──────────────────┘
+```
+
+详细架构说明请参阅：
+- [架构文档](docs/source/dev/architecture.rst) - Sphinx格式的完整架构文档
+- [架构图导航](docs/diagrams/README.md) - 如何查看和使用架构图
 
 ## 系统要求
 
@@ -295,6 +364,64 @@ code_execution:
 4. **模式检测**: 检测危险的代码模式
 5. **沙箱执行**: 在隔离的子进程中运行
 
+## 🚀 生产环境部署
+
+我们提供了完整的生产环境部署指南，支持多种部署方式：
+
+### 部署方式
+
+| 方式 | 适用规模 | 难度 | 自动扩展 |
+|------|----------|------|----------|
+| **Docker Compose** | < 1,000 用户 | ⭐⭐⭐⭐⭐ | ❌ |
+| **Kubernetes** | 1,000-10,000+ 用户 | ⭐⭐⭐ | ✅ |
+| **Systemd** | 小型部署 | ⭐⭐⭐⭐ | ❌ |
+| **AWS ECS** | 企业级 | ⭐⭐⭐ | ✅ |
+| **GCP Cloud Run** | 无服务器 | ⭐⭐⭐⭐ | ✅ |
+
+### 快速部署（Docker Compose）
+
+```bash
+# 1. 克隆项目
+git clone <repository-url>
+cd ai_search
+
+# 2. 配置环境变量
+cp .env.example .env
+# 编辑 .env 文件，填入 API 密钥
+
+# 3. 启动服务
+docker-compose up -d
+
+# 4. 访问应用
+# Web UI: http://localhost:8000
+# Health Check: http://localhost:8000/health
+```
+
+### 生产环境特性
+
+我们的部署指南涵盖：
+
+- ✅ **SSL/TLS 加密** - HTTPS 强制、安全头配置
+- ✅ **负载均衡** - Nginx 反向代理、Kubernetes Ingress
+- ✅ **自动扩展** - Horizontal Pod Autoscaler（3-10 pods）
+- ✅ **健康检查** - Liveness 和 Readiness 探针
+- ✅ **监控告警** - Prometheus 指标、ELK 日志聚合
+- ✅ **备份恢复** - 自动数据库备份、灾难恢复流程
+- ✅ **性能优化** - Redis 缓存、连接池、CDN
+- ✅ **安全加固** - 防火墙规则、速率限制、Docker 隔离
+
+### 完整部署文档
+
+详细的部署指南请参阅：
+- **[部署指南](docs/source/guide/deployment.rst)** - 1,387 行完整生产部署文档
+  - Docker Compose 完整配置
+  - Kubernetes 7个清单文件
+  - AWS/GCP/Azure 云部署
+  - 安全加固指南
+  - 监控和日志配置
+  - 故障排查手册
+  - 维护检查清单
+
 ## 常见问题
 
 ### Q1: 如何设置代理？
@@ -349,6 +476,44 @@ MIT License
 ---
 
 ## 📚 完整文档系统
+
+我们提供了两套完整的文档系统：
+
+### 🌐 Sphinx API 文档（推荐）
+
+完整的 API 参考文档，使用 Sphinx 自动从代码生成：
+
+- **构建文档**：
+  ```bash
+  cd docs
+  make html
+  ```
+
+- **查看文档**：
+  打开 `docs/build/html/index.html` 在浏览器中查看
+
+- **包含内容**：
+  - **API 参考** - 所有模块的自动生成文档
+    - [路由系统](docs/source/api/routing.rst) - 智能路由和任务分类
+    - [代理系统](docs/source/api/agents.rst) - 研究、代码、聊天、RAG代理
+    - [工具集](docs/source/api/tools.rst) - 搜索、爬虫、向量存储、领域工具
+    - [LLM管理器](docs/source/api/llm.rst) - 多提供商LLM集成
+    - [工作流引擎](docs/source/api/workflow.rst) - DAG执行、任务编排
+    - [Web应用](docs/source/api/web.rst) - FastAPI路由和数据库
+    - [工具函数](docs/source/api/utils.rst) - 配置、日志、辅助函数
+
+  - **用户指南** - 安装、配置和使用
+    - [安装指南](docs/source/guide/installation.rst) - 完整安装步骤
+    - [配置指南](docs/source/guide/configuration.rst) - 所有配置选项详解
+    - [使用指南](docs/source/guide/usage.rst) - CLI、Web UI、Python API
+    - [部署指南](docs/source/guide/deployment.rst) - 生产环境部署（Docker、K8s、云平台）
+
+  - **开发文档** - 架构和贡献指南
+    - [架构文档](docs/source/dev/architecture.rst) - 系统设计和组件说明
+    - [测试指南](docs/source/dev/testing.rst) - 单元测试、集成测试、负载测试
+    - [贡献指南](docs/source/dev/contributing.rst) - 如何为项目做贡献
+
+### 📖 Markdown 功能文档
 
 详细的文档位于 `docs/` 文件夹。我们提供了一套完整的29份文档，包括快速开始、架构设计、功能指南、API参考等。
 

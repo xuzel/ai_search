@@ -1,6 +1,6 @@
 """Weather Tool - Fetch weather information using OpenWeatherMap API"""
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from pyowm import OWM
 from pyowm.utils.config import get_default_config

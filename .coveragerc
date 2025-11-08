@@ -1,0 +1,54 @@
+# Coverage.py configuration file
+
+[run]
+source = src
+branch = True
+omit =
+    */tests/*
+    */test_*.py
+    */__pycache__/*
+    */venv/*
+    */env/*
+    */site-packages/*
+    # Exclude web UI for now (requires running server)
+    src/web/*
+    # Exclude workflow (to be tested in Phase 7.3)
+    src/workflow/*
+
+[report]
+precision = 2
+show_missing = True
+skip_covered = False
+skip_empty = False
+
+# Exclude lines with these patterns from coverage
+exclude_lines =
+    # Standard pragma
+    pragma: no cover
+    # Don't complain about missing debug-only code
+    def __repr__
+    def __str__
+    # Don't complain if tests don't hit defensive assertion code
+    raise AssertionError
+    raise NotImplementedError
+    # Don't complain if non-runnable code isn't run
+    if __name__ == .__main__.:
+    if __name__ == "__main__":
+    # Type checking
+    if TYPE_CHECKING:
+    # Abstract methods
+    @abstract
+    @abstractmethod
+    # Pass statements
+    pass
+
+[html]
+directory = htmlcov
+title = AI Search Engine Coverage Report
+
+[xml]
+output = coverage.xml
+
+[json]
+output = coverage.json
+pretty_print = True

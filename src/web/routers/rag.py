@@ -1,32 +1,24 @@
 """RAG Document Q&A Router"""
 
 import asyncio
-import logging
-from typing import List, Optional
 from pathlib import Path
 
 from fastapi import APIRouter, Request, Form, UploadFile, File, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
-from pydantic import BaseModel
-import markdown
-from markdown.extensions.codehilite import CodeHiliteExtension
-from markdown.extensions.fenced_code import FencedCodeExtension
-from markdown.extensions.tables import TableExtension
 
-from src.utils import get_config
+from src.utils import get_config, get_logger
 from src.llm import LLMManager
 from src.agents import RAGAgent
-from src.tools import VectorStore
 from src.web import database
 from src.web.upload_manager import UploadManager
+from src.web.dependencies.formatters import convert_markdown_to_html
+from src.web.middleware import limiter, get_limit
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 router = APIRouter()
 
 # Global instances
-config = None
-llm_manager = None
 rag_agent = None
 upload_manager = None
 
@@ -68,6 +60,7 @@ async def rag_page(request: Request):
 
 
 @router.post("/rag/upload", response_class=HTMLResponse)
+@limiter.limit(get_limit("upload"))  # 10 requests/minute
 async def upload_document(
     request: Request,
     file: UploadFile = File(...)
@@ -168,6 +161,7 @@ async def process_document_background(doc_id: int, filepath: str):
 
 
 @router.post("/rag/query", response_class=HTMLResponse)
+@limiter.limit(get_limit("query"))  # 30 requests/minute
 async def query_documents(
     request: Request,
     query: str = Form(...),
@@ -199,17 +193,9 @@ async def query_documents(
         logger.info(f"RAG query: {query}")
         result = await rag_agent.query(query, top_k=top_k, show_progress=False)
 
-        # Convert answer to HTML markdown
+        # Convert answer to HTML markdown (using singleton processor)
         if result.get('answer'):
-            md = markdown.Markdown(
-                extensions=[
-                    FencedCodeExtension(),
-                    CodeHiliteExtension(),
-                    TableExtension(),
-                    'nl2br',
-                ]
-            )
-            result['answer'] = md.convert(result['answer'])
+            result['answer'] = convert_markdown_to_html(result['answer'])
 
         # Save to conversation history
         import json

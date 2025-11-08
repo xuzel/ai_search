@@ -1,8 +1,9 @@
-"""Main CLI Application"""
+"""Main CLI Application - Refactored with New Routing System
+
+This version uses the unified routing system instead of the old Router class.
+"""
 
 import asyncio
-import os
-from typing import Optional
 
 import typer
 from rich.console import Console
@@ -12,8 +13,9 @@ from rich.table import Table
 
 from src.agents import ChatAgent, CodeAgent, ResearchAgent
 from src.llm import LLMManager
-from src.router import Router, TaskType
+from src.routing import create_router, TaskType  # ✅ New routing system
 from src.tools import CodeExecutor, ScraperTool, SearchTool
+from src.tools.code_validator import SecurityLevel
 from src.utils import get_config, get_logger
 
 logger = get_logger(__name__)
@@ -21,9 +23,18 @@ console = Console()
 
 app = typer.Typer(help="AI Search Engine - Research and Code Execution")
 
-# Global instances
+# Initialize once (still global for CLI, but using new components)
 config = get_config()
 llm_manager = LLMManager(config=config)
+
+# ✅ Use new unified router
+router = create_router(
+    config=config,
+    llm_manager=llm_manager,
+    router_type='hybrid'  # Uses keyword + LLM fallback
+)
+
+# Initialize tools
 search_tool = SearchTool(
     provider=config.search.provider,
     api_key=config.search.serpapi_key,
@@ -36,8 +47,13 @@ scraper_tool = ScraperTool(
 code_executor = CodeExecutor(
     timeout=config.code_execution.timeout,
     max_output_lines=config.code_execution.max_output_lines,
+    security_level=SecurityLevel(config.code_execution.security_level),
+    enable_docker=config.code_execution.enable_docker,
+    enable_validation=config.code_execution.enable_validation,
+    memory_limit=config.code_execution.memory_limit,
 )
 
+# Initialize agents
 research_agent = ResearchAgent(
     llm_manager=llm_manager,
     search_tool=search_tool,
@@ -94,29 +110,35 @@ def search(
 
 @app.command()
 def solve(
-    problem: str = typer.Argument(..., help="Math problem or question"),
+    problem: str = typer.Argument(..., help="Problem to solve with code"),
+    show_code: bool = typer.Option(True, "--show-code/--no-code", help="Show generated code"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output", is_flag=True),
 ):
-    """Solve a math problem or execute code"""
+    """Solve a problem using code execution"""
 
     console.print(Panel(f"[cyan]Solving: {problem}[/cyan]", expand=False))
 
     try:
-        result = asyncio.run(code_agent.solve(problem, show_progress=True))
+        result = asyncio.run(code_agent.solve(problem))
 
         if result["success"]:
-            console.print(Panel("[green]Solution Complete[/green]", expand=False))
+            console.print(Panel("[green]Solution Found[/green]", expand=False))
 
-            console.print(f"\n[bold cyan]Output:[/bold cyan]")
-            console.print(result["output"])
+            if show_code and result.get("code"):
+                console.print("\n[bold cyan]Generated Code:[/bold cyan]")
+                syntax = Syntax(result["code"], "python", theme="monokai", line_numbers=True)
+                console.print(syntax)
+
+            if result.get("output"):
+                console.print("\n[bold cyan]Output:[/bold cyan]")
+                console.print(result["output"])
+
+            if result.get("explanation"):
+                console.print("\n[bold cyan]Explanation:[/bold cyan]")
+                console.print(result["explanation"])
         else:
-            console.print(Panel("[red]Execution Failed[/red]", expand=False))
-            console.print(f"\n[bold red]Error:[/bold red]")
-            console.print(result["error"])
-
-        # Explanation
-        console.print(f"\n[bold cyan]Explanation:[/bold cyan]")
-        console.print(result["explanation"])
+            console.print(f"[red]Error: {result.get('error', 'Unknown error')}[/red]")
+            raise typer.Exit(1)
 
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
@@ -128,152 +150,152 @@ def solve(
 
 @app.command()
 def ask(
-    query: str = typer.Argument(..., help="Question to ask"),
-    auto: bool = typer.Option(False, "--auto", "-a", help="Auto-detect task type"),
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
-    use_llm: bool = typer.Option(True, "--llm/--no-llm", help="Use LLM for classification (default: True)"),
+    query: str = typer.Argument(..., help="Question or query"),
+    auto: bool = typer.Option(True, "--auto/--manual", help="Auto-route to appropriate agent"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output", is_flag=True),
 ):
-    """Ask a question (auto-routes to appropriate agent)"""
+    """Ask a question and auto-route to the appropriate agent
 
-    if auto:
-        # Use hybrid classification: keyword-based for fast cases, LLM for uncertain ones
-        if use_llm:
-            task_type, confidence, method = asyncio.run(
-                Router.classify_hybrid(query, llm_manager, use_llm_threshold=0.6)
-            )
-        else:
-            # Keyword-based only
-            task_type = Router.classify(query)
-            confidence = Router.get_confidence(query, task_type)
-            method = "keyword"
+    ✨ This command uses the new unified routing system!
+    """
 
-        if verbose:
+    console.print(Panel(f"[cyan]Query: {query}[/cyan]", expand=False))
+
+    try:
+        if auto:
+            # ✅ Use new routing system
+            console.print("[dim]Routing query...[/dim]")
+            decision = asyncio.run(router.route(query))
+
+            task_type = decision.primary_task_type
+            confidence = decision.task_confidence
+
             console.print(
-                f"[yellow]Detected: {task_type.value} (confidence: {confidence:.1%}, method: {method})[/yellow]"
+                f"[dim]Routed to: {task_type.value} "
+                f"(confidence: {confidence:.2f})[/dim]"
             )
+            console.print(f"[dim]Reasoning: {decision.reasoning}[/dim]\n")
 
-        if task_type == TaskType.RESEARCH:
-            console.print(Panel("[cyan]Research Mode[/cyan]", expand=False))
-            if not config.search.serpapi_key:
-                console.print(
-                    "[yellow]Warning: Research mode requires SERPAPI_API_KEY[/yellow]"
-                )
-            try:
-                result = asyncio.run(research_agent.research(query, show_progress=True))
-                console.print("\n[bold cyan]Summary:[/bold cyan]")
-                console.print(result["summary"])
-            except Exception as e:
-                console.print(f"[red]Research failed: {e}[/red]")
-
-        elif task_type == TaskType.CODE:
-            console.print(Panel("[cyan]Code Execution Mode[/cyan]", expand=False))
-            try:
-                result = asyncio.run(code_agent.solve(query, show_progress=True))
-                if result["success"]:
-                    console.print(f"\n[bold cyan]Explanation:[/bold cyan]")
-                    console.print(result["explanation"])
-                else:
-                    console.print(f"\n[bold red]Error:[/bold red]")
-                    console.print(result["error"])
-            except Exception as e:
-                console.print(f"[red]Code execution failed: {e}[/red]")
-
+            # Execute based on task type
+            if task_type == TaskType.RESEARCH:
+                asyncio.run(_execute_research(query))
+            elif task_type == TaskType.CODE:
+                asyncio.run(_execute_code(query))
+            elif task_type == TaskType.CHAT:
+                asyncio.run(_execute_chat(query))
+            else:
+                # Default to chat
+                asyncio.run(_execute_chat(query))
         else:
-            console.print(Panel("[cyan]Chat Mode[/cyan]", expand=False))
-            try:
-                response = asyncio.run(chat_agent.chat(query))
-                console.print(f"\n[cyan]{response}[/cyan]")
-            except Exception as e:
-                console.print(f"[red]Chat failed: {e}[/red]")
+            # Manual mode: just chat
+            asyncio.run(_execute_chat(query))
 
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        if verbose:
+            import traceback
+            traceback.print_exc()
+        raise typer.Exit(1)
+
+
+async def _execute_research(query: str):
+    """Execute research task"""
+    result = await research_agent.research(query, show_progress=True)
+    console.print("\n[bold cyan]Summary:[/bold cyan]")
+    console.print(result["summary"])
+
+
+async def _execute_code(query: str):
+    """Execute code task"""
+    result = await code_agent.solve(query)
+    if result["success"]:
+        if result.get("output"):
+            console.print("\n[bold cyan]Output:[/bold cyan]")
+            console.print(result["output"])
     else:
-        # Default chat mode
-        try:
-            response = asyncio.run(chat_agent.chat(query))
-            console.print(f"\n[cyan]{response}[/cyan]")
-        except Exception as e:
-            console.print(f"[red]Error: {e}[/red]")
-            if verbose:
-                import traceback
-                traceback.print_exc()
-            raise typer.Exit(1)
+        console.print(f"[red]Error: {result.get('error')}[/red]")
+
+
+async def _execute_chat(query: str):
+    """Execute chat task"""
+    result = await chat_agent.chat(query)
+    console.print(f"\n{result.get('message', result.get('answer', 'No response'))}")
 
 
 @app.command()
-def chat(verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output", is_flag=True)):
-    """Enter interactive chat mode"""
+def chat():
+    """Start interactive chat session"""
 
-    console.print(Panel("[cyan]AI Search Engine - Chat Mode[/cyan]", expand=False))
-    console.print("[yellow]Type 'exit' or 'quit' to exit, 'clear' to clear history[/yellow]\n")
-
-    chat_agent.clear_history()
+    console.print(Panel("[cyan]Interactive Chat Mode[/cyan]", expand=False))
+    console.print("[dim]Type 'exit' or 'quit' to end the session[/dim]\n")
 
     while True:
         try:
-            user_input = console.input("[green]You:[/green] ").strip()
+            query = console.input("[bold green]You:[/bold green] ")
 
-            if not user_input:
-                continue
-
-            if user_input.lower() in ["exit", "quit"]:
-                console.print("[yellow]Goodbye![/yellow]")
+            if query.lower() in ["exit", "quit", "q"]:
+                console.print("\n[cyan]Goodbye![/cyan]")
                 break
 
-            if user_input.lower() == "clear":
-                chat_agent.clear_history()
-                console.print("[yellow]Chat history cleared[/yellow]\n")
+            if not query.strip():
                 continue
 
-            response = asyncio.run(chat_agent.chat(user_input))
-            console.print(f"[cyan]Assistant:[/cyan] {response}\n")
+            result = asyncio.run(chat_agent.chat(query))
+            console.print(
+                f"[bold blue]AI:[/bold blue] {result.get('message', result.get('answer', 'No response'))}\n"
+            )
 
         except KeyboardInterrupt:
-            console.print("[yellow]Goodbye![/yellow]")
+            console.print("\n[cyan]Goodbye![/cyan]")
             break
         except Exception as e:
             console.print(f"[red]Error: {e}[/red]")
-            if verbose:
-                import traceback
-                traceback.print_exc()
+            continue
 
 
 @app.command()
 def info():
     """Show system information"""
 
-    table = Table(title="System Information")
+    table = Table(title="AI Search Engine - System Info")
+
     table.add_column("Component", style="cyan")
     table.add_column("Status", style="green")
+    table.add_column("Details", style="yellow")
 
-    # Check LLM providers
-    for provider_name in llm_manager.list_providers():
-        table.add_row(f"LLM: {provider_name}", "✓ Configured")
+    # LLM providers
+    providers = llm_manager.list_providers()
+    table.add_row(
+        "LLM Providers",
+        "✓ Available",
+        f"{len(providers)} provider(s): {', '.join(providers)}"
+    )
 
-    # Check search API
-    if config.search.serpapi_key:
-        table.add_row("Search API", "✓ Configured")
-    else:
-        table.add_row("Search API", "✗ Not configured")
+    # ✅ Router info
+    table.add_row(
+        "Router",
+        "✓ Unified",
+        f"{router.name} (keyword + LLM hybrid)"
+    )
+
+    # Search tool
+    search_status = "✓ Ready" if config.search.serpapi_key else "✗ Not configured"
+    table.add_row(
+        "Search Tool",
+        search_status,
+        f"Provider: {config.search.provider}"
+    )
+
+    # Code executor
+    security_info = code_executor.get_security_info()
+    docker_status = "✓ Enabled" if security_info['docker_available'] else "✗ Disabled"
+    table.add_row(
+        "Code Executor",
+        docker_status,
+        f"Security: {security_info['security_level']}"
+    )
 
     console.print(table)
-
-    console.print("\n[bold]Configuration:[/bold]")
-    console.print(f"  Config file: config/config.yaml")
-    console.print(f"  LLM providers: {', '.join(llm_manager.list_providers())}")
-    console.print(f"  Search provider: {config.search.provider}")
-
-
-@app.callback(invoke_without_command=True)
-def main(
-    ctx: typer.Context,
-    config_path: Optional[str] = typer.Option(
-        None, "--config", "-c", help="Path to config file"
-    ),
-):
-    """AI Search Engine - Research, code execution, and chat powered by LLMs"""
-    if ctx.invoked_subcommand is None:
-        console.print("[cyan]AI Search Engine[/cyan]")
-        console.print("Use --help to see available commands")
 
 
 if __name__ == "__main__":

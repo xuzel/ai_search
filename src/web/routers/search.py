@@ -3,16 +3,13 @@
 import json
 from fastapi import APIRouter, Request, Form
 from fastapi.responses import HTMLResponse
-import markdown
-from markdown.extensions.codehilite import CodeHiliteExtension
-from markdown.extensions.fenced_code import FencedCodeExtension
-from markdown.extensions.tables import TableExtension
 
 from src.agents import ResearchAgent
 from src.llm import LLMManager
 from src.tools import SearchTool, ScraperTool
 from src.utils import get_config, get_logger
 from src.web import database
+from src.web.dependencies.formatters import convert_markdown_to_html
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -49,16 +46,8 @@ async def search(request: Request, query: str = Form(...)):
         logger.info(f"Research query: {query}")
         result = await research_agent.research(query, show_progress=False)
 
-        # Render summary as Markdown
-        md = markdown.Markdown(
-            extensions=[
-                FencedCodeExtension(),
-                CodeHiliteExtension(),
-                TableExtension(),
-                'nl2br',
-            ]
-        )
-        summary_html = md.convert(result["summary"])
+        # Render summary as Markdown (using singleton processor)
+        summary_html = convert_markdown_to_html(result["summary"])
 
         # Save to history
         await database.save_conversation(

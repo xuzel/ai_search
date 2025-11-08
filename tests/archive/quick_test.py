@@ -91,7 +91,13 @@ async def test_all():
     # 测试 5: 路由器
     print("\n【测试 5】查询路由器")
     try:
-        from src.router import Router, TaskType
+        from src.routing import create_router, TaskType
+        from src.utils import get_config
+        from src.llm import LLMManager
+
+        config = get_config()
+        llm_manager = LLMManager(config=config)
+        router = create_router(config, llm_manager, router_type='keyword')
 
         test_cases = [
             ("今天北京天气怎么样", TaskType.DOMAIN_WEATHER),
@@ -101,11 +107,11 @@ async def test_all():
 
         all_pass = True
         for query, expected in test_cases:
-            result = Router.classify(query)
-            if result == expected:
-                print(f"   ✓ '{query}' -> {result.value}")
+            decision = await router.route(query)
+            if decision.primary_task_type == expected:
+                print(f"   ✓ '{query}' -> {decision.primary_task_type.value}")
             else:
-                print(f"   ✗ '{query}' -> {result.value} (期望: {expected.value})")
+                print(f"   ✗ '{query}' -> {decision.primary_task_type.value} (期望: {expected.value})")
                 all_pass = False
 
         if all_pass:

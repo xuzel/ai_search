@@ -10,7 +10,7 @@ Features:
 
 import asyncio
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any, Callable, Dict, Optional, Set
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -349,7 +349,7 @@ class WorkflowEngine:
         if on_progress:
             try:
                 await on_progress(task.id, TaskStatus.RUNNING, None)
-            except:
+            except Exception:
                 pass
 
         # Retry loop
@@ -385,14 +385,14 @@ class WorkflowEngine:
                 if on_progress:
                     try:
                         await on_progress(task.id, TaskStatus.COMPLETED, result)
-                    except:
+                    except Exception:
                         pass
 
                 # Success callback
                 if task.on_success:
                     try:
                         await task.on_success(result)
-                    except:
+                    except Exception:
                         pass
 
                 return
@@ -427,14 +427,14 @@ class WorkflowEngine:
         if on_progress:
             try:
                 await on_progress(task.id, TaskStatus.FAILED, task.error)
-            except:
+            except Exception:
                 pass
 
         # Failure callback
         if task.on_failure:
             try:
                 await task.on_failure(task.error)
-            except:
+            except Exception:
                 pass
 
 

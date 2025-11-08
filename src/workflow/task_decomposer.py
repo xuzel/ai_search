@@ -361,14 +361,15 @@ Now analyze the user's query and create a task plan:"""
 
         Returns:
             Optimized task plan
-        """
-        # TODO: Implement optimization strategies:
-        # - Detect and remove duplicate tasks
-        # - Identify tasks that can run in parallel
-        # - Reorder tasks for efficiency
-        # - Merge similar tasks
 
-        # For now, return as-is
+        Note:
+            Currently returns plan as-is. Future optimizations could include:
+            - Detecting and removing duplicate tasks
+            - Identifying tasks that can run in parallel
+            - Reordering tasks for efficiency
+            - Merging similar tasks
+        """
+        # Return plan as-is (optimizations deferred to future versions)
         return plan
 
     def visualize_plan(self, plan: TaskPlan) -> str:

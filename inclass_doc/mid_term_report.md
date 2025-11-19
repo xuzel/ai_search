@@ -242,18 +242,18 @@ flowchart LR
 
 #### Overview
 
-| 核心功能                                        | 状态   | 实现关键组件                                             | 遇到问题                                                     |
-| ----------------------------------------------- | ------ | -------------------------------------------------------- | ------------------------------------------------------------ |
-| 智能源选择 (Intelligent Source Selection)       | 已完成 | HybridRouter、KeywordRouter、LLMRouter、TaskType分类系统 | NA                                                           |
-| 本地RAG实现 (Local RAG Implementation)          | 已完成 | RAGAgent、VectorStore、DocumentProcessor、ChromaDB集成   | 当前embedding模型只支持英文，换大模型会出现计算效率下降的情况 |
-| 高级重排和过滤 (Advanced Reranking & Filtering) | 已完成 | Reranker系统、CredibilityScorer、BGE重排模型             | NA                                                           |
-| 动态工作流自动化 (Dynamic Workflow Automation)  | 已完成 | WorkflowEngine、TaskDecomposer、DAG执行引擎              | NA                                                           |
-| 多模态支持 (Multimodal Support)                 | 已完成 | OCRTool、VisionTool、DocumentProcessor、文件上传系统     | PaddleOCR只支持图像中的文本识别并不能够像VLM那样子能够理解图片内容，如果部署VLM耗费资源 |
-| 领域特定智能 (Domain-Specific Intelligence)     | 已完成 | WeatherTool、FinanceTool、RoutingTool、多个API集成       | API限额，并且当前没有集成到WEB主页面路由中                   |
-| **附加功能：Web UI**                            | 已完成 | FastAPI应用、Jinja2模板、HTMX、9个路由器                 | NA                                                           |
-| **附加功能：代码执行和安全**                    | 已完成 | CodeAgent、CodeExecutor、3层安全验证                     | NA                                                           |
-| **附加功能：对话历史管理**                      | 已完成 | ChatAgent、SQLite数据库、异步持久化                      | NA                                                           |
-| **附加功能：测试覆盖**                          | 已完成 | 173个测试函数、11个测试文件、多种测试标记                | NA                                                           |
+| 核心功能                                        | 状态   | 实现关键组件                                             |
+| ----------------------------------------------- | ------ | -------------------------------------------------------- |
+| 智能源选择 (Intelligent Source Selection)       | 已完成 | HybridRouter、KeywordRouter、LLMRouter、TaskType分类系统 |
+| 本地RAG实现 (Local RAG Implementation)          | 已完成 | RAGAgent、VectorStore、DocumentProcessor、ChromaDB集成   |
+| 高级重排和过滤 (Advanced Reranking & Filtering) | 已完成 | Reranker系统、CredibilityScorer、BGE重排模型             |
+| 动态工作流自动化 (Dynamic Workflow Automation)  | 已完成 | WorkflowEngine、TaskDecomposer、DAG执行引擎              |
+| 多模态支持 (Multimodal Support)                 | 已完成 | OCRTool、VisionTool、DocumentProcessor、文件上传系统     |
+| 领域特定智能 (Domain-Specific Intelligence)     | 已完成 | WeatherTool、FinanceTool、RoutingTool、多个API集成       |
+| **附加功能：Web UI**                            | 已完成 | FastAPI应用、Jinja2模板、HTMX、9个路由器                 |
+| **附加功能：代码执行和安全**                    | 已完成 | CodeAgent、CodeExecutor、3层安全验证                     |
+| **附加功能：对话历史管理**                      | 已完成 | ChatAgent、SQLite数据库、异步持久化                      |
+| **附加功能：测试覆盖**                          | 已完成 | 173个测试函数、11个测试文件、多种测试标记                |
 
 #### 功能详细说明
 
@@ -283,25 +283,10 @@ flowchart LR
     Cache --> Decision
 
     Decision --> Tasks["11种任务类型"]
-    Tasks --> R["🔍 RESEARCH"]
-    Tasks --> C["💻 CODE"]
-    Tasks --> Q["📚 RAG"]
-    Tasks --> W["🌤 WEATHER"]
-    Tasks --> F["💹 FINANCE"]
-    Tasks --> RT["🛣 ROUTING"]
-    Tasks --> O["📸 OCR"]
-    Tasks --> V["👁 VISION"]
-    Tasks --> WF["⚙ WORKFLOW"]
 
-    R --> Agents["🤖 Agent执行"]
-    C --> Agents
-    Q --> Agents
-    W --> Agents
-    F --> Agents
-    RT --> Agents
-    O --> Agents
-    V --> Agents
-    WF --> Agents
+
+    Tasks --> Agents["🤖 Agent执行"]
+
 ```
 
 **关键特性**：

@@ -149,7 +149,7 @@ async def get_routing_tool() -> Optional[RoutingTool]:
     if _routing_tool is None:
         _routing_tool = RoutingTool(
             api_key=config.domain_tools.routing.api_key,
-            profile=config.domain_tools.routing.default_profile
+            default_profile=config.domain_tools.routing.default_profile
         )
         logger.info("RoutingTool instance created")
 

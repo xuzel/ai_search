@@ -77,12 +77,15 @@ class RAGAgent:
         )
 
         # RAG parameters
-        if config:
+        if config and hasattr(config, 'rag') and hasattr(config.rag, 'retrieval'):
             self.retrieval_top_k = getattr(config.rag.retrieval, "top_k", 10)
-            self.similarity_threshold = getattr(config.rag.retrieval, "similarity_threshold", 0.7)
+            self.similarity_threshold = getattr(config.rag.retrieval, "similarity_threshold", 0.5)  # ✅ Changed default from 0.7 to 0.5
+            logger.info(f"RAG retrieval settings: top_k={self.retrieval_top_k}, threshold={self.similarity_threshold}")
         else:
-            self.retrieval_top_k = 10
-            self.similarity_threshold = 0.7
+            # ✅ If config unavailable, use updated defaults matching config.yaml
+            self.retrieval_top_k = 20
+            self.similarity_threshold = 0.5  # ✅ Changed from 0.7 to 0.5
+            logger.warning(f"Config not available, using defaults: top_k={self.retrieval_top_k}, threshold={self.similarity_threshold}")
 
     async def ingest_document(
         self,
@@ -112,25 +115,52 @@ class RAGAgent:
                 print(f"🔍 Using Advanced PDF Processor (intelligent page type detection)...")
             try:
                 pdf_result = await self.advanced_pdf_processor.process_pdf(file_path)
-                # Convert AdvancedPDFProcessor output to DocumentProcessor format
-                full_text = pdf_result.get("full_text", "")
-                documents = [{
-                    "content": full_text,
-                    "metadata": {
-                        "source": file_path,
-                        "type": "pdf",
-                        "page_count": pdf_result.get("total_pages", 0),
-                        "processing_strategy": pdf_result.get("processing_strategy", "auto"),
-                        "page_types": pdf_result.get("page_type_distribution", {})
-                    }
-                }]
-                if show_progress:
-                    stats = pdf_result.get("page_type_distribution", {})
-                    print(f"✅ PDF processed: {pdf_result.get('total_pages', 0)} pages")
-                    if stats:
-                        print(f"   - Page types: text={stats.get('text', 0)}, "
-                              f"scanned={stats.get('scanned', 0)}, "
-                              f"complex={stats.get('complex', 0)}")
+
+                # ✅ Check if PDF processing failed
+                if "error" in pdf_result:
+                    logger.error(f"PDF processing failed: {pdf_result['error']}")
+                    if show_progress:
+                        print(f"❌ PDF processing failed: {pdf_result['error']}")
+                        print(f"🔄 Falling back to basic DocumentProcessor...")
+                    # Fallback to DocumentProcessor
+                    documents = self.document_processor.process_file(file_path)
+                    if show_progress:
+                        print(f"✅ Extracted {len(documents)} sections (using fallback)")
+                else:
+                    # Convert AdvancedPDFProcessor output to DocumentProcessor format
+                    full_text = pdf_result.get("full_text", "")
+
+                    # ✅ Check if extracted text is empty
+                    if not full_text or not full_text.strip():
+                        logger.warning(f"PDF {file_path} has no extractable text, trying fallback processor")
+                        if show_progress:
+                            print(f"⚠️ No text extracted, trying fallback processor...")
+                        documents = self.document_processor.process_file(file_path)
+                        if show_progress:
+                            print(f"✅ Extracted {len(documents)} sections (using fallback)")
+                    else:
+                        # ✅ Convert page_type_distribution dict to JSON string for ChromaDB compatibility
+                        import json
+                        page_types_dict = pdf_result.get("page_type_distribution", {})
+                        page_types_str = json.dumps(page_types_dict) if page_types_dict else "{}"
+
+                        documents = [{
+                            "content": full_text,
+                            "metadata": {
+                                "source": file_path,
+                                "type": "pdf",
+                                "page_count": pdf_result.get("total_pages", 0),
+                                "processing_strategy": pdf_result.get("processing_strategy", "auto"),
+                                "page_types": page_types_str  # ✅ Now a JSON string, not dict
+                            }
+                        }]
+                        if show_progress:
+                            stats = pdf_result.get("page_type_distribution", {})
+                            print(f"✅ PDF processed: {pdf_result.get('total_pages', 0)} pages")
+                            if stats:
+                                print(f"   - Page types: text={stats.get('text', 0)}, "
+                                      f"scanned={stats.get('scanned', 0)}, "
+                                      f"complex={stats.get('complex', 0)}")
             except Exception as e:
                 logger.warning(f"AdvancedPDFProcessor failed for {file_path}, fallback to DocumentProcessor: {e}")
                 documents = self.document_processor.process_file(file_path)

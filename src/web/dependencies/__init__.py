@@ -30,6 +30,7 @@ from src.web.dependencies.core import (
     get_code_agent,
     get_chat_agent,
     get_rag_agent,
+    get_master_agent,
 )
 
 from src.web.dependencies.tools import (
@@ -60,6 +61,7 @@ __all__ = [
     'get_code_agent',
     'get_chat_agent',
     'get_rag_agent',
+    'get_master_agent',
     # Tool dependencies
     'get_search_tool',
     'get_scraper_tool',

@@ -186,6 +186,15 @@ Instructions:
    - List dependencies (IDs of subtasks that must complete first)
    - Assign an output variable name
 
+⚠️ **IMPORTANT - API Language Requirements**:
+- **weather**: City names MUST be in English (e.g., "Beijing" not "北京")
+- **finance**: Stock symbols MUST be in English (e.g., "AAPL" not "苹果")
+- **routing**: Locations MUST be in English with FULL ADDRESS including city/country to avoid geocoding errors
+  - ✅ Good: "Kennedy Town, Hong Kong to Hong Kong International Airport, Hong Kong"
+  - ✅ Good: "Beijing, China to Shanghai, China"
+  - ❌ Bad: "Kennedy Town to Airport" (too vague, may cause wrong geocoding)
+- **Other tools (chat, code, search, rag, ocr, vision)**: Can use original language
+
 4. Return ONLY a JSON response (no other text) in this format:
 {{
     "goal": "High-level objective",
@@ -276,6 +285,142 @@ Query: "Compare AAPL and TSLA stock prices and tell me which is better value"
     ]
 }}
 
+Query: "北京今天天气怎么样？帮我规划去长城的路线"
+{{
+    "goal": "获取北京天气并规划去长城路线",
+    "complexity": "medium",
+    "subtasks": [
+        {{
+            "id": "step1",
+            "description": "获取北京当前天气",
+            "tool": "weather",
+            "query": "Beijing",
+            "dependencies": [],
+            "output_variable": "beijing_weather"
+        }},
+        {{
+            "id": "step2",
+            "description": "规划北京到长城的路线",
+            "tool": "routing",
+            "query": "Beijing, China to Great Wall of China, Beijing, China",
+            "dependencies": [],
+            "output_variable": "route_info"
+        }},
+        {{
+            "id": "step3",
+            "description": "综合天气和路线信息给出建议",
+            "tool": "chat",
+            "query": "根据天气{{{{beijing_weather}}}}和路线{{{{route_info}}}}，给出出行建议",
+            "dependencies": ["step1", "step2"],
+            "output_variable": "recommendation"
+        }}
+    ]
+}}
+
+Query: "帮我查一下北京天气和TSLA的股价"
+{{
+    "goal": "查询北京天气和TSLA股价",
+    "complexity": "low",
+    "subtasks": [
+        {{
+            "id": "step1",
+            "description": "获取北京天气",
+            "tool": "weather",
+            "query": "Beijing",
+            "dependencies": [],
+            "output_variable": "weather_data"
+        }},
+        {{
+            "id": "step2",
+            "description": "获取TSLA股价",
+            "tool": "finance",
+            "query": "TSLA",
+            "dependencies": [],
+            "output_variable": "tsla_price"
+        }}
+    ]
+}}
+
+Query: "上海今天冷不冷？"
+{{
+    "goal": "查询上海天气情况",
+    "complexity": "low",
+    "subtasks": [
+        {{
+            "id": "step1",
+            "description": "Get current weather in Shanghai",
+            "tool": "weather",
+            "query": "Shanghai",
+            "dependencies": [],
+            "output_variable": "shanghai_weather"
+        }}
+    ]
+}}
+
+Query: "这张图片是什么？提取里面的文字"
+{{
+    "goal": "分析图片内容并提取文字",
+    "complexity": "low",
+    "subtasks": [
+        {{
+            "id": "step1",
+            "description": "分析图片内容",
+            "tool": "vision",
+            "query": "描述这张图片的内容",
+            "dependencies": [],
+            "output_variable": "image_description"
+        }},
+        {{
+            "id": "step2",
+            "description": "从图片中提取文字",
+            "tool": "ocr",
+            "query": "提取图片中的所有文字",
+            "dependencies": [],
+            "output_variable": "extracted_text"
+        }},
+        {{
+            "id": "step3",
+            "description": "整合图片分析和文字提取结果",
+            "tool": "chat",
+            "query": "图片内容：{{{{image_description}}}}，提取的文字：{{{{extracted_text}}}}。请整合这些信息。",
+            "dependencies": ["step1", "step2"],
+            "output_variable": "final_result"
+        }}
+    ]
+}}
+
+Query: "Provide the route from Kennedy Town to Hong Kong International Airport"
+{{
+    "goal": "Get route from Kennedy Town to Hong Kong International Airport",
+    "complexity": "low",
+    "subtasks": [
+        {{
+            "id": "step1",
+            "description": "Calculate route from Kennedy Town to Airport",
+            "tool": "routing",
+            "query": "Kennedy Town, Hong Kong to Hong Kong International Airport, Hong Kong",
+            "dependencies": [],
+            "output_variable": "route_data"
+        }}
+    ]
+}}
+
+Query: "从杭州到上海最快的路线是什么？"
+{{
+    "goal": "查询杭州到上海的最快路线",
+    "complexity": "low",
+    "subtasks": [
+        {{
+            "id": "step1",
+            "description": "查询杭州到上海的路线",
+            "tool": "routing",
+            "query": "Hangzhou, Zhejiang, China to Shanghai, China",
+            "dependencies": [],
+            "output_variable": "route_data"
+        }}
+    ]
+}}
+
 Now analyze the user's query and create a task plan:"""
 
         return prompt
@@ -322,16 +467,49 @@ Now analyze the user's query and create a task plan:"""
         # Try to guess the best tool based on keywords
         query_lower = query.lower()
 
-        if any(kw in query_lower for kw in ["weather", "temperature", "天气"]):
+        # Weather keywords (天气相关)
+        if any(kw in query_lower for kw in [
+            "weather", "temperature", "天气", "气温", "温度",
+            "下雨", "晴天", "阴天", "雾霾", "forecast", "今天天气"
+        ]):
             tool = "weather"
-        elif any(kw in query_lower for kw in ["stock", "price", "股票"]):
+        # Finance keywords (金融相关)
+        elif any(kw in query_lower for kw in [
+            "stock", "price", "股票", "股价", "行情", "财经",
+            "金融", "涨跌", "market", "ticker", "equity"
+        ]):
             tool = "finance"
-        elif any(kw in query_lower for kw in ["route", "direction", "路线"]):
+        # Routing keywords (路线相关)
+        elif any(kw in query_lower for kw in [
+            "route", "direction", "路线", "导航", "路线规划",
+            "怎么去", "地图", "navigation", "directions", "how to get"
+        ]):
             tool = "routing"
-        elif any(kw in query_lower for kw in ["calculate", "compute", "计算"]):
+        # OCR keywords (文字识别相关)
+        elif any(kw in query_lower for kw in [
+            "ocr", "extract text", "文字识别", "识别文字",
+            "提取文字", "读取文字", "recognize text"
+        ]):
+            tool = "ocr"
+        # Vision keywords (图像分析相关)
+        elif any(kw in query_lower for kw in [
+            "image", "photo", "picture", "图片", "图像",
+            "照片", "看图", "describe image", "what's in"
+        ]):
+            tool = "vision"
+        # Code keywords (代码执行相关)
+        elif any(kw in query_lower for kw in [
+            "calculate", "compute", "计算", "算", "数学",
+            "fibonacci", "斐波那契", "math", "solve", "求解"
+        ]):
             tool = "code"
-        elif any(kw in query_lower for kw in ["document", "文档", "pdf"]):
+        # RAG keywords (文档问答相关)
+        elif any(kw in query_lower for kw in [
+            "document", "文档", "pdf", "文件", "文档问答",
+            "知识库", "file", "upload", "上传"
+        ]):
             tool = "rag"
+        # Default to search
         else:
             tool = "search"
 

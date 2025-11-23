@@ -15,19 +15,58 @@
 
 <!-- Unified Search Box -->
 <div class="search-container">
-  <form hx-post="/query" hx-target="#results" hx-indicator="#loading" class="search-box">
+  <form hx-post="/query" hx-target="#results" hx-indicator="#loading" hx-encoding="multipart/form-data" class="search-box">
     <div class="search-input-wrapper">
       <span class="search-icon">🔍</span>
       <input
         type="text"
         name="query"
         class="search-input"
-        placeholder="Ask anything... (e.g., 'What is AI?', 'Calculate 15% of 200', 'Tell me a joke')"
-        required
+        placeholder="Ask anything... Upload images/documents for analysis"
         autocomplete="off"
         autofocus
       />
       <button type="submit" class="btn btn-primary search-submit">Search</button>
+    </div>
+
+    <!-- File Upload Area -->
+    <div style="margin-top: var(--space-3);">
+      <div class="file-upload-area" id="fileUploadArea">
+        <input
+          type="file"
+          name="file"
+          id="fileInput"
+          accept=".pdf,.txt,.md,.docx,.png,.jpg,.jpeg,.bmp,.gif"
+          style="display: none;"
+          onchange="handleFileSelect(event)"
+        />
+        <label for="fileInput" class="file-upload-label">
+          <span style="font-size: 2rem;">📎</span>
+          <p style="margin: var(--space-2) 0 0;">
+            <strong>Click to upload</strong> or drag and drop
+          </p>
+          <p style="font-size: var(--text-sm); color: var(--text-secondary); margin-top: var(--space-1);">
+            Images (PNG, JPG) • Documents (PDF, TXT, MD, DOCX)
+          </p>
+        </label>
+      </div>
+
+      <!-- File Preview -->
+      <div id="filePreview" style="display: none; margin-top: var(--space-3);">
+        <div style="display: flex; align-items: center; padding: var(--space-3); background: var(--color-surface); border-radius: var(--radius-md); border: 1px solid var(--color-border);">
+          <span id="fileIcon" style="font-size: 1.5rem; margin-right: var(--space-3);">📄</span>
+          <div style="flex: 1;">
+            <div id="fileName" style="font-weight: 500;"></div>
+            <div id="fileSize" style="font-size: var(--text-sm); color: var(--text-secondary);"></div>
+          </div>
+          <button type="button" onclick="clearFile()" class="btn btn-sm" style="background: none; border: none; font-size: 1.2rem; cursor: pointer;">
+            ✕
+          </button>
+        </div>
+        <div id="fileHint" style="margin-top: var(--space-2); font-size: var(--text-sm); color: var(--text-secondary); padding: var(--space-2); background: var(--color-surface-secondary); border-radius: var(--radius-sm);">
+          <!-- Dynamic hint based on file type -->
+        </div>
+      </div>
     </div>
 
     <!-- Type Indicator (shown after classification) -->
@@ -130,7 +169,7 @@
     </div>
 
     <!-- Image & OCR -->
-    <div class="card" style="opacity: 0.7;">
+    <div class="card card-interactive" onclick="document.querySelector('#fileInput').click()">
       <div class="card-header">
         <div style="font-size: var(--text-3xl); margin-bottom: var(--space-3);">🖼️</div>
         <h3 class="card-title">Image & OCR</h3>
@@ -142,13 +181,13 @@
         </p>
       </div>
       <div class="card-footer">
-        <span class="badge badge-warning">Coming Soon</span>
+        <span class="badge badge-success">Available Now</span>
         <span class="badge badge-secondary">Multimodal</span>
       </div>
     </div>
 
     <!-- Tools -->
-    <div class="card" style="opacity: 0.7;">
+    <div class="card card-interactive" onclick="document.querySelector('.search-input').focus()">
       <div class="card-header">
         <div style="font-size: var(--text-3xl); margin-bottom: var(--space-3);">🛠️</div>
         <h3 class="card-title">Domain Tools</h3>
@@ -160,7 +199,7 @@
         </p>
       </div>
       <div class="card-footer">
-        <span class="badge badge-warning">Coming Soon</span>
+        <span class="badge badge-success">Available Now</span>
         <span class="badge badge-secondary">API</span>
       </div>
     </div>
@@ -179,14 +218,94 @@
     <button class="btn btn-outline btn-sm" onclick="fillQuery('Calculate 25% of 480')">
       Calculate 25% of 480
     </button>
-    <button class="btn btn-outline btn-sm" onclick="fillQuery('Write a Python function to reverse a string')">
-      Write a Python function
+    <button class="btn btn-outline btn-sm" onclick="fillQuery('What\'s the weather in Beijing?')">
+      Weather in Beijing
     </button>
-    <button class="btn btn-outline btn-sm" onclick="fillQuery('Tell me a fun fact')">
-      Tell me a fun fact
+    <button class="btn btn-outline btn-sm" onclick="fillQuery('Compare AAPL and TSLA stock prices')">
+      Compare stocks
+    </button>
+    <button class="btn btn-outline btn-sm" onclick="document.querySelector('#fileInput').click()">
+      📷 Upload image to analyze
     </button>
   </div>
 </div>
+
+<style>
+.file-upload-area {
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-6);
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: var(--color-surface);
+  position: relative;
+  overflow: hidden;
+}
+
+.file-upload-area::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(var(--color-primary-rgb, 59, 130, 246), 0.1), transparent);
+  transition: left 0.5s;
+}
+
+.file-upload-area:hover::before {
+  left: 100%;
+}
+
+.file-upload-area:hover {
+  border-color: var(--color-primary);
+  background: var(--color-surface-secondary);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.file-upload-area.drag-over {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  background-opacity: 0.05;
+  border-width: 3px;
+  transform: scale(1.02);
+  box-shadow: 0 8px 24px rgba(var(--color-primary-rgb, 59, 130, 246), 0.2);
+}
+
+.file-upload-label {
+  cursor: pointer;
+  display: block;
+  position: relative;
+  z-index: 1;
+}
+
+.file-upload-label strong {
+  color: var(--color-primary);
+  transition: all 0.2s;
+}
+
+.file-upload-area:hover .file-upload-label strong {
+  text-decoration: underline;
+}
+
+/* File preview animation */
+#filePreview {
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+</style>
 
 <script>
 // Fill query in search box
@@ -196,10 +315,97 @@ function fillQuery(text) {
   input.focus();
 }
 
+// Handle file selection
+function handleFileSelect(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  showFilePreview(file);
+}
+
+// Show file preview
+function showFilePreview(file) {
+  const preview = document.getElementById('filePreview');
+  const uploadArea = document.getElementById('fileUploadArea');
+  const fileName = document.getElementById('fileName');
+  const fileSize = document.getElementById('fileSize');
+  const fileIcon = document.getElementById('fileIcon');
+  const fileHint = document.getElementById('fileHint');
+
+  // Show preview, hide upload area
+  preview.style.display = 'block';
+  uploadArea.style.display = 'none';
+
+  // Set file info
+  fileName.textContent = file.name;
+  fileSize.textContent = formatFileSize(file.size);
+
+  // Set icon and hint based on file type
+  const ext = file.name.split('.').pop().toLowerCase();
+
+  if (['png', 'jpg', 'jpeg', 'bmp', 'gif'].includes(ext)) {
+    fileIcon.textContent = '🖼️';
+    fileHint.innerHTML = `
+      <strong>Image uploaded!</strong> You can:
+      <br>• Ask "What's in this image?" for AI analysis
+      <br>• Ask "Extract the text" for OCR
+      <br>• Ask specific questions about the image
+    `;
+  } else if (['pdf', 'txt', 'md', 'docx'].includes(ext)) {
+    fileIcon.textContent = '📄';
+    fileHint.innerHTML = `
+      <strong>Document uploaded!</strong>
+      <br>• The document will be added to the knowledge base
+      <br>• You can ask questions about its content
+      <br>• Example: "Summarize this document"
+    `;
+  }
+}
+
+// Clear file
+function clearFile() {
+  const fileInput = document.getElementById('fileInput');
+  const preview = document.getElementById('filePreview');
+  const uploadArea = document.getElementById('fileUploadArea');
+
+  fileInput.value = '';
+  preview.style.display = 'none';
+  uploadArea.style.display = 'block';
+}
+
+// Format file size
+function formatFileSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+// Drag and drop support
+const uploadArea = document.getElementById('fileUploadArea');
+
+uploadArea.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  uploadArea.classList.add('drag-over');
+});
+
+uploadArea.addEventListener('dragleave', () => {
+  uploadArea.classList.remove('drag-over');
+});
+
+uploadArea.addEventListener('drop', (e) => {
+  e.preventDefault();
+  uploadArea.classList.remove('drag-over');
+
+  const files = e.dataTransfer.files;
+  if (files.length > 0) {
+    document.getElementById('fileInput').files = files;
+    showFilePreview(files[0]);
+  }
+});
+
 // Show manual mode selection
 function showManualModes() {
-  // This will be implemented in Phase 1.2
-  alert('Manual mode selection coming in Phase 1.2!');
+  alert('All modes are now automatically detected! Just ask your question or upload a file.');
 }
 
 // Make showToast available globally
@@ -207,7 +413,7 @@ function showToast(message, type) {
   if (window.utils && window.utils.showToast) {
     window.utils.showToast(message, type);
   } else {
-    alert(message);
+    console.log(message);
   }
 }
 </script>

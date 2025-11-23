@@ -1,0 +1,425 @@
+<!-- Unified Result Component - For MasterAgent Results -->
+<div class="result-card">
+  <!-- Error Display -->
+  {% if error %}
+  <div class="result-header">
+    <h2 class="result-title">❌ Error</h2>
+  </div>
+  <div class="result-content">
+    <div style="padding: var(--space-4); background-color: var(--color-error-bg); border-left: 4px solid var(--color-error); border-radius: var(--radius-md); color: var(--color-error);">
+      <strong>Error:</strong> {{ error }}
+    </div>
+  </div>
+  <div style="margin-top: var(--space-6);">
+    <button class="btn btn-primary" onclick="window.location.href='/'">
+      ← Try Again
+    </button>
+  </div>
+  {% else %}
+
+  <!-- Header -->
+  <div class="result-header">
+    <div>
+      <h2 class="result-title">
+        {{ '📂' if has_file else '🤖' }} AI Answer
+      </h2>
+      <div class="result-meta">
+        <!-- Tools Used -->
+        {% if tools_used %}
+        <div style="width: 100%;">
+          <!-- Tool Flow Visualization -->
+          <div class="tool-flow-container">
+            <div class="tool-flow-label">Execution Flow:</div>
+            <div class="tool-flow">
+              <div class="flow-start">Query</div>
+              {% for tool in tools_used %}
+              <div class="flow-arrow">→</div>
+              <div class="flow-tool {% if loop.last %}flow-tool-final{% endif %}">
+                <span class="flow-tool-icon">
+                  {% if tool == 'search' %}🔍
+                  {% elif tool == 'code' %}💻
+                  {% elif tool == 'chat' %}💬
+                  {% elif tool == 'weather' %}🌤️
+                  {% elif tool == 'finance' %}📈
+                  {% elif tool == 'routing' %}🗺️
+                  {% elif tool == 'ocr' %}📝
+                  {% elif tool == 'vision' %}👁️
+                  {% elif tool == 'rag' %}📚
+                  {% else %}🔧
+                  {% endif %}
+                </span>
+                <span class="flow-tool-name">
+                  {% if tool == 'search' %}Search
+                  {% elif tool == 'code' %}Code
+                  {% elif tool == 'chat' %}Chat
+                  {% elif tool == 'weather' %}Weather
+                  {% elif tool == 'finance' %}Finance
+                  {% elif tool == 'routing' %}Routing
+                  {% elif tool == 'ocr' %}OCR
+                  {% elif tool == 'vision' %}Vision
+                  {% elif tool == 'rag' %}RAG
+                  {% else %}{{ tool }}
+                  {% endif %}
+                </span>
+              </div>
+              {% endfor %}
+              <div class="flow-arrow">→</div>
+              <div class="flow-end">Answer</div>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
+        <!-- Confidence -->
+        {% if confidence %}
+        <span style="color: var(--text-secondary); font-size: var(--text-sm);">
+          Confidence: {{ (confidence * 100) | int }}%
+        </span>
+        {% endif %}
+      </div>
+    </div>
+    <div>
+      <button class="btn btn-secondary btn-sm" onclick="window.location.href='/'">
+        New Query
+      </button>
+    </div>
+  </div>
+
+  <!-- Query Display -->
+  <div style="padding: var(--space-4); background-color: var(--color-surface); border-radius: var(--radius-md); margin-bottom: var(--space-6); border: 1px solid var(--color-border);">
+    <div style="font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-2);">
+      Your Query:
+    </div>
+    <div style="font-weight: 500;">{{ query }}</div>
+
+    <!-- File Info if uploaded -->
+    {% if has_file %}
+    <div style="margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--color-border);">
+      <div style="display: flex; align-items: center; gap: var(--space-2);">
+        <span style="font-size: 1.2rem;">📎</span>
+        <span style="font-size: var(--text-sm); color: var(--text-secondary);">
+          File: <strong>{{ filename }}</strong>
+        </span>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Main Answer -->
+  <div class="result-content">
+    <h3 style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-4); color: var(--text-primary);">
+      Answer
+    </h3>
+    <div style="line-height: 1.7; font-size: var(--text-base);">
+      {{ answer | safe }}
+    </div>
+  </div>
+
+  <!-- Key Points (if any) -->
+  {% if key_points and key_points | length > 0 %}
+  <div style="margin-top: var(--space-6); padding: var(--space-4); background-color: var(--color-surface-secondary); border-radius: var(--radius-md); border-left: 4px solid var(--color-primary);">
+    <h4 style="font-size: var(--text-md); font-weight: 600; margin-bottom: var(--space-3); color: var(--text-primary);">
+      📌 Key Points
+    </h4>
+    <ul style="margin: 0; padding-left: var(--space-5);">
+      {% for point in key_points %}
+      <li style="margin-bottom: var(--space-2); color: var(--text-primary);">{{ point }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <!-- Sources (if any) -->
+  {% if sources and sources | length > 0 %}
+  <div style="margin-top: var(--space-8);">
+    <h3 style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-4); color: var(--text-primary);">
+      📚 Sources ({{ sources | length }})
+    </h3>
+    <div class="source-list">
+      {% for source in sources %}
+      <div class="source-item">
+        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: var(--space-2);">
+          <h4 class="source-title">{{ source.title | default('Source ' ~ loop.index) }}</h4>
+          {% if source.credibility_score %}
+          <span class="credibility-badge {% if source.credibility_score >= 0.8 %}high{% elif source.credibility_score >= 0.5 %}medium{% else %}low{% endif %}">
+            {% if source.credibility_score >= 0.8 %}🏆 High{% elif source.credibility_score >= 0.5 %}✓ Medium{% else %}⚠️ Low{% endif %}
+            {{ (source.credibility_score * 100) | int }}%
+          </span>
+          {% endif %}
+        </div>
+        {% if source.url %}
+        <a href="{{ source.url }}" target="_blank" class="source-url">{{ source.url }}</a>
+        {% endif %}
+        {% if source.content %}
+        <p style="margin-top: var(--space-3); color: var(--text-secondary); font-size: var(--text-sm);">
+          {{ source.content[:200] }}...
+        </p>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Detailed Results (Collapsible) -->
+  {% if details and details | length > 0 %}
+  <div style="margin-top: var(--space-8);">
+    <details style="border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-4);">
+      <summary style="cursor: pointer; font-weight: 600; color: var(--text-primary); user-select: none;">
+        🔍 View Detailed Results
+      </summary>
+      <div style="margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--color-border);">
+        {% for key, value in details.items() %}
+        <div style="margin-bottom: var(--space-4);">
+          <h5 style="font-size: var(--text-sm); font-weight: 600; color: var(--text-secondary); margin-bottom: var(--space-2); text-transform: uppercase;">
+            {{ key }}
+          </h5>
+          <div style="padding: var(--space-3); background-color: var(--color-surface); border-radius: var(--radius-sm); font-family: monospace; font-size: var(--text-sm); overflow-x: auto;">
+            {% if value is string %}
+            {{ value[:500] }}{% if value | length > 500 %}...{% endif %}
+            {% else %}
+            {{ value | tojson(indent=2) }}
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </details>
+  </div>
+  {% endif %}
+
+  <!-- Actions -->
+  <div style="margin-top: var(--space-8); display: flex; gap: var(--space-3); flex-wrap: wrap;">
+    <button class="btn btn-primary" onclick="window.location.href='/'">
+      ← New Query
+    </button>
+    <button class="btn btn-outline" onclick="window.location.href='/history'">
+      📜 View History
+    </button>
+    <button class="btn btn-outline" onclick="window.print()">
+      🖨️ Print Results
+    </button>
+  </div>
+
+  {% endif %}
+</div>
+
+<style>
+/* Source list styles */
+.source-list {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.source-item {
+  padding: var(--space-4);
+  background-color: var(--color-surface);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  transition: all 0.2s;
+}
+
+.source-item:hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.source-title {
+  font-size: var(--text-md);
+  font-weight: 600;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.source-url {
+  font-size: var(--text-sm);
+  color: var(--color-primary);
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.source-url:hover {
+  text-decoration: underline;
+}
+
+.credibility-badge {
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.credibility-badge.high {
+  background-color: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.credibility-badge.medium {
+  background-color: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.credibility-badge.low {
+  background-color: var(--color-error-bg);
+  color: var(--color-error);
+}
+
+/* Result card styles */
+.result-card {
+  background-color: var(--color-bg);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  max-width: 900px;
+  margin: var(--space-6) auto;
+}
+
+.result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--space-6);
+  padding-bottom: var(--space-4);
+  border-bottom: 2px solid var(--color-border);
+}
+
+.result-title {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  margin: 0 0 var(--space-2) 0;
+  color: var(--text-primary);
+}
+
+.result-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.result-content {
+  color: var(--text-primary);
+}
+
+/* Print styles */
+/* Tool Flow Visualization */
+.tool-flow-container {
+  margin: var(--space-4) 0;
+  padding: var(--space-4);
+  background: var(--color-surface-secondary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+}
+
+.tool-flow-label {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  font-weight: 500;
+  margin-bottom: var(--space-3);
+}
+
+.tool-flow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  animation: flowIn 0.6s ease-out;
+}
+
+@keyframes flowIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.flow-start, .flow-end {
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-primary);
+  color: white;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.flow-end {
+  background: var(--color-success);
+}
+
+.flow-arrow {
+  color: var(--text-tertiary);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.flow-tool {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: white;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  transition: all 0.3s;
+  animation: toolAppear 0.5s ease-out backwards;
+  animation-delay: calc(var(--tool-index, 0) * 0.1s);
+}
+
+.flow-tool:hover {
+  transform: translateY(-2px);
+  border-color: var(--color-primary);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.flow-tool-final {
+  border-color: var(--color-success);
+  background: var(--color-success-bg);
+}
+
+@keyframes toolAppear {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.flow-tool-icon {
+  font-size: var(--text-lg);
+  line-height: 1;
+}
+
+.flow-tool-name {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+@media print {
+  .btn,
+  button,
+  details {
+    display: none !important;
+  }
+
+  .result-card {
+    box-shadow: none;
+    border: 1px solid #ddd;
+  }
+
+  .tool-flow-container {
+    border-color: #ddd;
+  }
+}
+</style>

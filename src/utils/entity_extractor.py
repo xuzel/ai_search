@@ -231,12 +231,15 @@ class EntityExtractor:
                 EntityExtractor._normalize_city_name(destination)
             )
 
-        # Pattern 2: "从 X 到 Y" (Chinese)
-        chinese_pattern = re.compile(r'从\s*([^\s到]+)\s*到\s*([^\s]+)')
+        # Pattern 2: "从 X 到/去 Y" (Chinese)
+        # Supports both "到" and "去"
+        chinese_pattern = re.compile(r'从\s*([^\s到去]+)\s*[到去]\s*([^\s的需要怎么吗？]+)')
         match = chinese_pattern.search(query)
         if match:
             origin = match.group(1).strip()
             destination = match.group(2).strip()
+            # Remove common suffixes
+            destination = re.sub(r'(的路线|的导航|路线|导航)$', '', destination).strip()
             return (
                 EntityExtractor._normalize_city_name(origin),
                 EntityExtractor._normalize_city_name(destination)

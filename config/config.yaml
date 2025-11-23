@@ -184,9 +184,12 @@ cache:
 # RAG Configuration
 rag:
   enabled: true
-  embedding_model: "sentence-transformers/all-MiniLM-L6-v2"  # Lightweight model
-  # For Chinese/English: "jinaai/jina-embeddings-v2-base-zh" (requires pip install jina-embeddings-v2)
-  embedding_dimension: 384
+  # ✅ 升级到中英文强力模型 (1024维，语义理解能力强)
+  # 其他选择:
+  #   - "jinaai/jina-embeddings-v2-base-zh" (512维，速度更快)
+  #   - "BAAI/bge-m3" (1024维，多语言)
+  embedding_model: "BAAI/bge-large-zh-v1.5"
+  embedding_dimension: 1024  # ⚠️ 维度从384→1024，需重建向量库
   device: "cpu"  # or "cuda" for GPU
 
   # Vector store settings
@@ -196,14 +199,14 @@ rag:
   # Chunking strategy
   chunking:
     strategy: "semantic"  # Options: fixed, semantic, recursive
-    chunk_size: 512       # Target chunk size in characters
-    chunk_overlap: 77     # 15% overlap (recommended)
+    chunk_size: 768       # ✅ 增大chunk获得更多上下文 (512→768)
+    chunk_overlap: 115    # ✅ 保持15% overlap (768*0.15≈115)
     min_chunk_size: 100   # Minimum chunk size
 
   # Retrieval settings
   retrieval:
-    top_k: 10               # Number of chunks to retrieve
-    similarity_threshold: 0.7  # Minimum similarity score
+    top_k: 20               # ✅ 增加召回 (10→20)
+    similarity_threshold: 0.5  # ✅ 降低阈值以提高召回率 (0.7→0.5)
 
   # Reranking (Phase 2)
   reranking:
@@ -248,6 +251,7 @@ multimodal:
   # Vision API settings
   vision:
     enabled: true
-    provider: "gemini"  # Options: gemini, gpt4v, claude
-    model: "gemini-2.5-pro"
-    api_key: ${GOOGLE_API_KEY}
+    provider: "aliyun"  # Changed from "gemini" to "aliyun"
+    model: "qwen3-vl-plus"  # Options: qwen3-vl-plus, qwen3-vl-flash, qwen-vl-max
+    api_key: ${DASHSCOPE_API_KEY}  # Use Aliyun DashScope API key
+    base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"  # Beijing region

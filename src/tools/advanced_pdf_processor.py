@@ -163,12 +163,15 @@ class AdvancedPDFProcessor:
 
         for drawing in drawings:
             for item in drawing.get("items", []):
-                if item[0] == "l":  # Line
-                    x1, y1, x2, y2 = item[1], item[2], item[3], item[4]
-                    if abs(y1 - y2) < 1:  # Horizontal line
-                        h_lines += 1
-                    elif abs(x1 - x2) < 1:  # Vertical line
-                        v_lines += 1
+                # ✅ Check if item is a line and has enough elements
+                if item and len(item) > 0 and item[0] == "l":  # Line
+                    # ✅ Safely check tuple length before unpacking
+                    if len(item) >= 5:
+                        x1, y1, x2, y2 = item[1], item[2], item[3], item[4]
+                        if abs(y1 - y2) < 1:  # Horizontal line
+                            h_lines += 1
+                        elif abs(x1 - x2) < 1:  # Vertical line
+                            v_lines += 1
 
         # If many perpendicular lines, likely a table
         return h_lines >= 3 and v_lines >= 3
@@ -479,11 +482,13 @@ class AdvancedPDFProcessor:
                 combined_text = "\n".join(filter(None, text_parts))
                 all_text.append(combined_text)
 
+            # ✅ Save total_pages BEFORE closing the document
+            total_pages = len(doc)
             doc.close()
 
             return {
                 "pdf_path": str(pdf_path),
-                "total_pages": len(doc),
+                "total_pages": total_pages,  # ✅ Use saved value
                 "processed_pages": len(page_results),
                 "page_type_distribution": page_type_counts,
                 "pages": page_results,
@@ -492,12 +497,17 @@ class AdvancedPDFProcessor:
             }
 
         except Exception as e:
-            logger.error(f"Error processing PDF {pdf_path}: {e}")
+            logger.error(f"Error processing PDF {pdf_path}: {e}", exc_info=True)
+            # ✅ Return complete error response with all expected fields
             return {
                 "pdf_path": str(pdf_path),
                 "error": str(e),
                 "pages": [],
                 "full_text": "",
+                "total_pages": 0,  # ✅ Add missing field
+                "processed_pages": 0,
+                "page_type_distribution": {},  # ✅ Add missing field
+                "processing_strategy": strategy,
             }
 
     async def extract_tables_from_pdf(

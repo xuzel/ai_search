@@ -63,7 +63,9 @@ class WeatherTool:
             weather = observation.weather
 
             # Get temperature in specified units
-            temp_dict = weather.temperature(self.units)
+            # Convert metric/imperial to celsius/fahrenheit for PyOWM
+            temp_unit = 'celsius' if self.units == 'metric' else 'fahrenheit' if self.units == 'imperial' else 'kelvin'
+            temp_dict = weather.temperature(temp_unit)
 
             result = {
                 "location": location,
@@ -124,7 +126,8 @@ class WeatherTool:
                 date_str = weather.reference_time("iso").split("T")[0]
 
                 if date_str not in processed_dates:
-                    temp = weather.temperature(self.units)
+                    temp_unit = 'celsius' if self.units == 'metric' else 'fahrenheit' if self.units == 'imperial' else 'kelvin'
+                    temp = weather.temperature(temp_unit)
 
                     daily_forecasts.append({
                         "date": date_str,

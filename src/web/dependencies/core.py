@@ -13,6 +13,7 @@ from src.llm import LLMManager
 from src.routing import create_router, BaseRouter
 from src.agents import ResearchAgent, CodeAgent, ChatAgent
 from src.agents.rag_agent import RAGAgent
+from src.agents.master_agent import MasterAgent
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -24,6 +25,7 @@ _research_agent: Optional[ResearchAgent] = None
 _code_agent: Optional[CodeAgent] = None
 _chat_agent: Optional[ChatAgent] = None
 _rag_agent: Optional[RAGAgent] = None
+_master_agent: Optional[MasterAgent] = None
 
 
 @lru_cache()
@@ -193,13 +195,69 @@ async def get_rag_agent() -> RAGAgent:
     return _rag_agent
 
 
+async def get_master_agent() -> MasterAgent:
+    """Get MasterAgent instance
+
+    Returns:
+        MasterAgent: Singleton master agent instance
+    """
+    global _master_agent
+
+    if _master_agent is None:
+        # Get dependencies internally
+        llm_manager = await get_llm_manager()
+        config = get_config()
+
+        from src.web.dependencies.tools import (
+            get_search_tool,
+            get_scraper_tool,
+            get_code_executor,
+            get_weather_tool,
+            get_finance_tool,
+            get_routing_tool,
+            get_ocr_tool,
+            get_vision_tool,
+        )
+
+        # Get all tools
+        search_tool = await get_search_tool()
+        scraper_tool = await get_scraper_tool()
+        code_executor = await get_code_executor()
+        weather_tool = await get_weather_tool()
+        finance_tool = await get_finance_tool()
+        routing_tool = await get_routing_tool()
+        ocr_tool = await get_ocr_tool()
+        vision_tool = await get_vision_tool()
+
+        # Get RAG agent
+        rag_agent = await get_rag_agent()
+
+        # Create MasterAgent
+        _master_agent = MasterAgent(
+            llm_manager=llm_manager,
+            search_tool=search_tool,
+            scraper_tool=scraper_tool,
+            code_executor=code_executor,
+            weather_tool=weather_tool,
+            finance_tool=finance_tool,
+            routing_tool=routing_tool,
+            ocr_tool=ocr_tool,
+            vision_tool=vision_tool,
+            rag_agent=rag_agent,
+            config=config
+        )
+        logger.info("MasterAgent instance created")
+
+    return _master_agent
+
+
 # Cleanup function (called on app shutdown)
 async def cleanup_dependencies():
     """Cleanup singleton instances
 
     Call this on app shutdown to properly cleanup resources.
     """
-    global _llm_manager, _router, _research_agent, _code_agent, _chat_agent, _rag_agent
+    global _llm_manager, _router, _research_agent, _code_agent, _chat_agent, _rag_agent, _master_agent
 
     logger.info("Cleaning up dependency instances")
 
@@ -209,3 +267,4 @@ async def cleanup_dependencies():
     _code_agent = None
     _chat_agent = None
     _rag_agent = None
+    _master_agent = None

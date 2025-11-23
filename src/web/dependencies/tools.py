@@ -214,8 +214,10 @@ async def get_vision_tool() -> Optional[VisionTool]:
 
     if _vision_tool is None:
         try:
-            llm_manager = await get_llm_manager()
-            _vision_tool = VisionTool(llm_manager=llm_manager)
+            _vision_tool = VisionTool(
+                api_key=config.multimodal.vision.api_key,
+                model=config.multimodal.vision.model
+            )
             logger.info("VisionTool instance created")
         except Exception as e:
             logger.warning(f"VisionTool initialization failed: {e}")

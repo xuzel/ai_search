@@ -269,23 +269,41 @@ class MasterAgent:
                     }
                 }
 
-        # Document files → RAG
+        # Document files → Intelligent Analysis (PDF) or RAG
         elif file_ext in ['pdf', 'txt', 'md', 'docx', 'doc']:
             if not self.rag_agent:
                 return {"error": "RAG not available"}
 
-            # Upload to RAG (async background)
-            logger.info(f"Uploading document to RAG: {filename}")
-            asyncio.create_task(
-                self._upload_to_rag_background(file_path, filename)
-            )
+            # ✅ For PDFs: Use intelligent multi-agent analysis if Vision available
+            if file_ext == 'pdf' and self.vision_tool and self._is_academic_paper_query(query):
+                logger.info(f"Using intelligent PDF analysis for: {filename}")
 
-            # Return context for RAG query
-            return {
-                "document_uploaded": True,
-                "filename": filename,
-                "rag_available": True,
-            }
+                # Background: Still upload to RAG for detailed queries later
+                asyncio.create_task(
+                    self._upload_to_rag_background(file_path, filename)
+                )
+
+                # Foreground: Intelligent analysis with Vision + LLM
+                analysis_result = await self._analyze_pdf_intelligently(
+                    file_path, query, filename
+                )
+
+                return {
+                    "direct_answer": analysis_result
+                }
+            else:
+                # Upload to RAG (async background)
+                logger.info(f"Uploading document to RAG: {filename}")
+                asyncio.create_task(
+                    self._upload_to_rag_background(file_path, filename)
+                )
+
+                # Return context for RAG query
+                return {
+                    "document_uploaded": True,
+                    "filename": filename,
+                    "rag_available": True,
+                }
 
         return {}
 
@@ -331,6 +349,152 @@ class MasterAgent:
 
         response = await self.chat_agent.chat(prompt)
         return response
+
+    def _is_academic_paper_query(self, query: str) -> bool:
+        """Detect if user is asking about academic paper content"""
+        paper_keywords = [
+            # Chinese
+            "论文", "摘要", "研究", "方法", "结论", "作者", "标题",
+            "实验", "结果", "讨论", "引言", "综述", "学术",
+            # English
+            "paper", "abstract", "research", "method", "conclusion",
+            "author", "title", "experiment", "result", "discussion",
+            "introduction", "review", "academic", "study"
+        ]
+        query_lower = query.lower()
+        return any(kw in query_lower for kw in paper_keywords)
+
+    async def _analyze_pdf_intelligently(
+        self,
+        file_path: str,
+        query: str,
+        filename: str
+    ) -> Dict[str, Any]:
+        """
+        Intelligent PDF analysis using Vision + LLM (multi-agent approach)
+
+        Strategy:
+        1. Convert first 3 pages to images (usually contain title, abstract, intro)
+        2. Use VisionTool to analyze each page
+        3. Use LLM to synthesize structured information
+        4. Return comprehensive answer
+
+        Args:
+            file_path: Path to PDF file
+            query: User query
+            filename: Original filename
+
+        Returns:
+            Dict with answer, tools_used, details, confidence
+        """
+        import fitz as pymupdf
+
+        logger.info(f"🔍 Starting intelligent PDF analysis for {filename}")
+
+        try:
+            # Open PDF
+            doc = pymupdf.open(file_path)
+            total_pages = len(doc)
+
+            # Analyze first 3 pages (or fewer if PDF is short)
+            pages_to_analyze = min(3, total_pages)
+            logger.info(f"📄 Analyzing first {pages_to_analyze} pages of {total_pages}")
+
+            page_analyses = []
+
+            for page_num in range(pages_to_analyze):
+                page = doc[page_num]
+
+                # Render page to image
+                mat = pymupdf.Matrix(2.0, 2.0)  # 2x zoom for better quality
+                pix = page.get_pixmap(matrix=mat)
+
+                # Save to temp file
+                import tempfile
+                temp_img = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+                pix.save(temp_img.name)
+                temp_img.close()
+
+                # Analyze with Vision
+                logger.info(f"🔎 Analyzing page {page_num + 1} with VisionTool...")
+                vision_result = await self.vision_tool.analyze_image(
+                    temp_img.name,
+                    prompt=f"""Analyze this page from an academic paper (page {page_num + 1}).
+Extract:
+- Title (if present)
+- Authors (if present)
+- Abstract (if present)
+- Section headings
+- Key content
+- Tables/figures descriptions
+
+Provide structured information.""",
+                    resize=False
+                )
+
+                page_analyses.append({
+                    "page_num": page_num + 1,
+                    "analysis": vision_result.get("analysis", "")
+                })
+
+                # Clean up temp file
+                import os
+                os.unlink(temp_img.name)
+
+            doc.close()
+
+            # Synthesize with LLM
+            logger.info("🧠 Synthesizing analysis with LLM...")
+            synthesis_prompt = f"""我使用视觉模型分析了学术论文《{filename}》的前 {pages_to_analyze} 页。
+
+以下是每一页的分析结果：
+
+"""
+            for pa in page_analyses:
+                synthesis_prompt += f"\n=== 第 {pa['page_num']} 页 ===\n{pa['analysis']}\n"
+
+            synthesis_prompt += f"""
+
+用户问题：{query}
+
+请基于以上分析回答用户的问题。如果用户询问：
+- 标题/摘要/作者：从第1-2页提取
+- 研究方法/结果/结论：总结关键信息
+- 总体概况：提供论文整体摘要
+
+请用中文回答，结构清晰，突出要点。"""
+
+            final_answer = await self.llm_manager.complete(
+                messages=[{"role": "user", "content": synthesis_prompt}],
+                temperature=0.3,
+                max_tokens=2000,
+            )
+
+            logger.info("✅ Intelligent PDF analysis completed")
+
+            return {
+                "answer": final_answer.strip(),
+                "tools_used": ["vision", "chat"],
+                "details": {
+                    "pages_analyzed": pages_to_analyze,
+                    "total_pages": total_pages,
+                    "vision_analyses": page_analyses,
+                },
+                "confidence": 0.90,  # High confidence for vision-based analysis
+                "sources": [filename],
+            }
+
+        except Exception as e:
+            logger.error(f"Intelligent PDF analysis failed: {e}", exc_info=True)
+
+            # Fallback: Simple error response
+            return {
+                "answer": f"抱歉，无法分析 PDF 文件：{str(e)}。请尝试使用 RAG 查询或提供更具体的问题。",
+                "tools_used": ["vision"],
+                "details": {"error": str(e)},
+                "confidence": 0.2,
+                "sources": [filename],
+            }
 
     async def _upload_to_rag_background(
         self,

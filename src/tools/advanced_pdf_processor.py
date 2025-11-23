@@ -492,12 +492,17 @@ class AdvancedPDFProcessor:
             }
 
         except Exception as e:
-            logger.error(f"Error processing PDF {pdf_path}: {e}")
+            logger.error(f"Error processing PDF {pdf_path}: {e}", exc_info=True)
+            # ✅ Return complete error response with all expected fields
             return {
                 "pdf_path": str(pdf_path),
                 "error": str(e),
                 "pages": [],
                 "full_text": "",
+                "total_pages": 0,  # ✅ Add missing field
+                "processed_pages": 0,
+                "page_type_distribution": {},  # ✅ Add missing field
+                "processing_strategy": strategy,
             }
 
     async def extract_tables_from_pdf(

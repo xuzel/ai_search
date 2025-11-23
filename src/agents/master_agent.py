@@ -497,6 +497,10 @@ class MasterAgent:
     ) -> str:
         """Enhance single tool result with LLM to generate natural language"""
 
+        # If result has llm_advice (routing fallback), use it directly
+        if isinstance(result, dict) and "llm_advice" in result:
+            return result["llm_advice"]
+
         prompt = f"""用户提问：{query}
 
 我使用了{tool_name}工具获取了以下信息：
@@ -618,12 +622,137 @@ class MasterAgent:
                 "suggestion": "Please specify route in format: 'from X to Y' or '从X到Y'"
             }
 
-        route_data = await self.routing_tool.get_route(
-            origin,
-            destination,
+        # Use LLM to refine addresses for better geocoding accuracy
+        refined_origin, refined_destination = await self._refine_addresses_with_llm(origin, destination)
+
+        # Use get_route_by_address() which handles geocoding internally
+        route_data = await self.routing_tool.get_route_by_address(
+            start_address=refined_origin,
+            end_address=refined_destination,
             profile="driving-car",
         )
+
+        # If routing failed, provide LLM-generated travel advice as fallback
+        if "error" in route_data:
+            logger.warning(f"Routing API failed: {route_data['error']}")
+            fallback_advice = await self._generate_routing_fallback(
+                refined_origin,
+                refined_destination,
+                route_data.get("error")
+            )
+            route_data["llm_advice"] = fallback_advice
+
         return route_data
+
+    async def _refine_addresses_with_llm(self, origin: str, destination: str) -> tuple[str, str]:
+        """Use LLM to refine addresses for better geocoding accuracy
+
+        This helps avoid geocoding errors by:
+        - Simplifying overly complex addresses
+        - Using well-known landmark names
+        - Keeping addresses concise for better geocoding
+
+        Args:
+            origin: Original starting address
+            destination: Original destination address
+
+        Returns:
+            Tuple of (refined_origin, refined_destination)
+        """
+        prompt = f"""You are a geocoding expert. Simplify the following addresses to work better with navigation APIs.
+
+⚠️ CRITICAL RULES:
+1. Keep addresses SIMPLE and CONCISE - geocoding APIs work better with short landmark names
+2. For large facilities (airports, stations), use ONLY the main facility name WITHOUT extra details
+3. Keep city/country information
+4. Remove overly specific details like "Terminal 1", "Departures Level", "Main Entrance", "Gate A", etc.
+5. Output ONLY the two refined addresses, one per line, no explanations
+
+✅ GOOD Examples:
+- "Hong Kong International Airport, Hong Kong" (simple, clean)
+- "Beijing Capital Airport, Beijing, China" (concise)
+- "Shanghai Railway Station, Shanghai, China" (landmark name only)
+
+❌ BAD Examples:
+- "Hong Kong International Airport Terminal 1 Departures Level, Hong Kong" (too detailed)
+- "Beijing Airport Gate 5, Beijing" (too specific)
+- "Shanghai Station East Entrance, Shanghai" (unnecessary detail)
+
+Original addresses:
+Origin: {origin}
+Destination: {destination}
+
+Refined addresses (simplified, one per line):"""
+
+        try:
+            response = await self.llm_manager.complete(
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.1,  # Very low temperature for consistent, simple output
+                max_tokens=100,   # Short output to encourage simplicity
+            )
+
+            # Parse response
+            lines = [line.strip() for line in response.strip().split('\n') if line.strip()]
+
+            if len(lines) >= 2:
+                refined_origin = lines[0]
+                refined_destination = lines[1]
+                logger.info(f"Address refinement: '{origin}' → '{refined_origin}', '{destination}' → '{refined_destination}'")
+                return refined_origin, refined_destination
+            else:
+                logger.warning(f"LLM address refinement failed, using original addresses")
+                return origin, destination
+
+        except Exception as e:
+            logger.error(f"Error refining addresses with LLM: {e}")
+            return origin, destination
+
+    async def _generate_routing_fallback(
+        self,
+        origin: str,
+        destination: str,
+        error: str
+    ) -> str:
+        """Generate travel advice when routing API fails
+
+        Uses LLM to provide:
+        - Alternative transportation methods
+        - Estimated travel time
+        - General directions
+        - Recommendations for better navigation tools
+
+        Args:
+            origin: Starting location
+            destination: Destination location
+            error: Error message from routing API
+
+        Returns:
+            Human-friendly travel advice
+        """
+        prompt = f"""The routing API failed to calculate a precise route, but please provide helpful travel advice.
+
+Origin: {origin}
+Destination: {destination}
+Error: {error}
+
+Provide practical travel advice including:
+1. Common transportation methods (metro, bus, taxi, car, etc.)
+2. Estimated travel time (approximate)
+3. General directions or route suggestions
+4. Recommendation to use other navigation apps for real-time routing
+
+Keep the response concise (3-5 sentences) and helpful. Use the language of the locations (Chinese for Chinese cities, English otherwise)."""
+
+        try:
+            advice = await self.llm_manager.complete(
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.5,
+                max_tokens=300,
+            )
+            return advice.strip()
+        except Exception as e:
+            logger.error(f"Error generating routing fallback: {e}")
+            return f"Unable to calculate route from {origin} to {destination}. Please use Google Maps or other navigation apps for directions."
 
     async def _execute_ocr(
         self,

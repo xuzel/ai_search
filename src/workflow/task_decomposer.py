@@ -189,7 +189,10 @@ Instructions:
 ⚠️ **IMPORTANT - API Language Requirements**:
 - **weather**: City names MUST be in English (e.g., "Beijing" not "北京")
 - **finance**: Stock symbols MUST be in English (e.g., "AAPL" not "苹果")
-- **routing**: Locations MUST be in English (e.g., "Shanghai" not "上海")
+- **routing**: Locations MUST be in English with FULL ADDRESS including city/country to avoid geocoding errors
+  - ✅ Good: "Kennedy Town, Hong Kong to Hong Kong International Airport, Hong Kong"
+  - ✅ Good: "Beijing, China to Shanghai, China"
+  - ❌ Bad: "Kennedy Town to Airport" (too vague, may cause wrong geocoding)
 - **Other tools (chat, code, search, rag, ocr, vision)**: Can use original language
 
 4. Return ONLY a JSON response (no other text) in this format:
@@ -299,7 +302,7 @@ Query: "北京今天天气怎么样？帮我规划去长城的路线"
             "id": "step2",
             "description": "规划北京到长城的路线",
             "tool": "routing",
-            "query": "Beijing to Great Wall",
+            "query": "Beijing, China to Great Wall of China, Beijing, China",
             "dependencies": [],
             "output_variable": "route_info"
         }},
@@ -382,6 +385,38 @@ Query: "这张图片是什么？提取里面的文字"
             "query": "图片内容：{{{{image_description}}}}，提取的文字：{{{{extracted_text}}}}。请整合这些信息。",
             "dependencies": ["step1", "step2"],
             "output_variable": "final_result"
+        }}
+    ]
+}}
+
+Query: "Provide the route from Kennedy Town to Hong Kong International Airport"
+{{
+    "goal": "Get route from Kennedy Town to Hong Kong International Airport",
+    "complexity": "low",
+    "subtasks": [
+        {{
+            "id": "step1",
+            "description": "Calculate route from Kennedy Town to Airport",
+            "tool": "routing",
+            "query": "Kennedy Town, Hong Kong to Hong Kong International Airport, Hong Kong",
+            "dependencies": [],
+            "output_variable": "route_data"
+        }}
+    ]
+}}
+
+Query: "从杭州到上海最快的路线是什么？"
+{{
+    "goal": "查询杭州到上海的最快路线",
+    "complexity": "low",
+    "subtasks": [
+        {{
+            "id": "step1",
+            "description": "查询杭州到上海的路线",
+            "tool": "routing",
+            "query": "Hangzhou, Zhejiang, China to Shanghai, China",
+            "dependencies": [],
+            "output_variable": "route_data"
         }}
     ]
 }}

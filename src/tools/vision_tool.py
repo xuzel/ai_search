@@ -1,9 +1,10 @@
-"""Vision Tool - Analyze images using Gemini Vision API"""
+"""Vision Tool - Analyze images using Aliyun Qwen3-VL-Plus API"""
 
+import base64
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import google.generativeai as genai
+from openai import OpenAI
 from PIL import Image
 
 from src.utils.logger import get_logger
@@ -12,36 +13,75 @@ logger = get_logger(__name__)
 
 
 class VisionTool:
-    """Analyze images using Gemini Vision API"""
+    """Analyze images using Aliyun Qwen3-VL-Plus (via OpenAI-compatible API)"""
 
     def __init__(
         self,
         api_key: str,
-        model: str = "gemini-2.0-flash-exp",
+        model: str = "qwen3-vl-plus",
+        base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1",
         max_image_size: int = 4096,
     ):
         """
-        Initialize Vision Tool
+        Initialize Vision Tool with Aliyun Qwen3-VL-Plus
 
         Args:
-            api_key: Google API key
-            model: Model name (gemini-2.0-flash-exp, gemini-1.5-pro, etc.)
+            api_key: Aliyun DashScope API key
+            model: Model name (qwen3-vl-plus, qwen3-vl-flash, qwen-vl-max, etc.)
+            base_url: API base URL (Beijing region by default)
             max_image_size: Maximum image dimension in pixels
         """
         if not api_key:
-            raise ValueError("Google API key is required")
+            raise ValueError("Aliyun DashScope API key is required")
 
         self.api_key = api_key
         self.model_name = model
         self.max_image_size = max_image_size
 
         try:
-            genai.configure(api_key=api_key)
-            self.model = genai.GenerativeModel(model)
-            logger.info(f"VisionTool initialized with model: {model}")
+            # Use OpenAI-compatible client
+            self.client = OpenAI(
+                api_key=api_key,
+                base_url=base_url,
+            )
+            logger.info(f"VisionTool initialized with Aliyun {model} (OpenAI-compatible API)")
         except Exception as e:
             logger.error(f"Failed to initialize VisionTool: {e}")
             raise
+
+    def _image_to_base64(self, image_path: str, resize: bool = True) -> str:
+        """
+        Convert image to base64 data URL
+
+        Args:
+            image_path: Path to image file
+            resize: Resize if too large
+
+        Returns:
+            Base64 data URL string
+        """
+        img = Image.open(image_path)
+
+        # Resize if needed
+        if resize and max(img.size) > self.max_image_size:
+            ratio = self.max_image_size / max(img.size)
+            new_size = tuple(int(dim * ratio) for dim in img.size)
+            img = img.resize(new_size, Image.Resampling.LANCZOS)
+            logger.debug(f"Resized image to {new_size}")
+
+        # Convert to RGB if needed (RGBA, P, etc. → RGB)
+        if img.mode not in ("RGB", "L"):
+            img = img.convert("RGB")
+
+        # Save to bytes
+        import io
+        buffer = io.BytesIO()
+        img.save(buffer, format="PNG")
+        image_bytes = buffer.getvalue()
+
+        # Encode to base64
+        base64_image = base64.b64encode(image_bytes).decode("utf-8")
+        return f"data:image/png;base64,{base64_image}"
 
     async def analyze_image(
         self,
@@ -68,24 +108,29 @@ class VisionTool:
         try:
             logger.info(f"Analyzing image: {image_path}")
 
-            # Load and optionally resize image
-            img = Image.open(image_path)
+            # Convert image to base64
+            image_data_url = self._image_to_base64(str(image_path), resize)
 
-            if resize and max(img.size) > self.max_image_size:
-                # Resize maintaining aspect ratio
-                ratio = self.max_image_size / max(img.size)
-                new_size = tuple(int(dim * ratio) for dim in img.size)
-                img = img.resize(new_size, Image.Resampling.LANCZOS)
-                logger.debug(f"Resized image to {new_size}")
-
-            # Generate content
-            response = self.model.generate_content([prompt, img])
+            # Call Qwen3-VL-Plus API
+            response = self.client.chat.completions.create(
+                model=self.model_name,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "image_url", "image_url": {"url": image_data_url}},
+                            {"type": "text", "text": prompt},
+                        ],
+                    }
+                ],
+            )
 
             result = {
                 "image_path": str(image_path),
                 "prompt": prompt,
-                "analysis": response.text,
+                "analysis": response.choices[0].message.content,
                 "model": self.model_name,
+                "description": response.choices[0].message.content,  # Alias for compatibility
             }
 
             logger.info(f"Image analysis complete for {image_path}")
@@ -98,6 +143,7 @@ class VisionTool:
                 "prompt": prompt,
                 "error": str(e),
                 "analysis": None,
+                "description": None,
             }
 
     async def extract_text_from_image(
@@ -193,29 +239,37 @@ class VisionTool:
             raise ValueError("Maximum 4 images can be compared at once")
 
         try:
-            # Load images
-            images = [Image.open(path) for path in image_paths]
+            # Convert all images to base64
+            image_data_urls = [self._image_to_base64(path) for path in image_paths]
 
             # Default comparison prompt
             if not comparison_prompt:
-                comparison_prompt = f"""Compare these {len(images)} images. Describe:
+                comparison_prompt = f"""Compare these {len(image_paths)} images. Describe:
                 1. Similarities between the images
                 2. Key differences
                 3. What each image shows
                 4. Overall comparison summary"""
 
-            # Generate content with multiple images
-            content = [comparison_prompt] + images
-            response = self.model.generate_content(content)
+            # Build content array with all images
+            content = []
+            for i, image_url in enumerate(image_data_urls):
+                content.append({"type": "image_url", "image_url": {"url": image_url}})
+            content.append({"type": "text", "text": comparison_prompt})
+
+            # Call API
+            response = self.client.chat.completions.create(
+                model=self.model_name,
+                messages=[{"role": "user", "content": content}],
+            )
 
             result = {
                 "image_paths": [str(p) for p in image_paths],
                 "image_count": len(image_paths),
-                "comparison": response.text,
+                "comparison": response.choices[0].message.content,
                 "model": self.model_name,
             }
 
-            logger.info(f"Compared {len(images)} images")
+            logger.info(f"Compared {len(image_paths)} images")
             return result
 
         except Exception as e:
@@ -278,7 +332,8 @@ class VisionTool:
             # Add PDF metadata
             result["pdf_path"] = pdf_path
             result["page_num"] = page_num
-            result["total_pages"] = len(doc)
+            total_pages = len(doc)
+            result["total_pages"] = total_pages
 
             # Clean up
             import os

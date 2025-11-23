@@ -205,7 +205,7 @@ async def get_ocr_tool() -> Optional[OCRTool]:
 
 
 async def get_vision_tool() -> Optional[VisionTool]:
-    """Get vision tool instance (if enabled)"""
+    """Get vision tool instance (if enabled) - Now using Aliyun Qwen3-VL-Plus"""
     global _vision_tool
 
     config = get_config()
@@ -214,11 +214,14 @@ async def get_vision_tool() -> Optional[VisionTool]:
 
     if _vision_tool is None:
         try:
+            # ✅ Updated to use Aliyun API with base_url
             _vision_tool = VisionTool(
                 api_key=config.multimodal.vision.api_key,
-                model=config.multimodal.vision.model
+                model=config.multimodal.vision.model,
+                base_url=getattr(config.multimodal.vision, 'base_url',
+                                'https://dashscope.aliyuncs.com/compatible-mode/v1')
             )
-            logger.info("VisionTool instance created")
+            logger.info(f"VisionTool instance created with Aliyun {config.multimodal.vision.model}")
         except Exception as e:
             logger.warning(f"VisionTool initialization failed: {e}")
             return None

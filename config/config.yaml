@@ -251,6 +251,7 @@ multimodal:
   # Vision API settings
   vision:
     enabled: true
-    provider: "gemini"  # Options: gemini, gpt4v, claude
-    model: "gemini-2.5-pro"
-    api_key: ${GOOGLE_API_KEY}
+    provider: "aliyun"  # Changed from "gemini" to "aliyun"
+    model: "qwen3-vl-plus"  # Options: qwen3-vl-plus, qwen3-vl-flash, qwen-vl-max
+    api_key: ${DASHSCOPE_API_KEY}  # Use Aliyun DashScope API key
+    base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"  # Beijing region

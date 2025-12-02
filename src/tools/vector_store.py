@@ -346,3 +346,125 @@ class VectorStore:
         logger.info(f"Updating embedding model to: {model_name}")
         self.embedding_model = SentenceTransformer(model_name)
         self.embedding_model_name = model_name
+
+    def hybrid_search(
+        self,
+        query: str,
+        k: int = 5,
+        where: Optional[Dict[str, Any]] = None,
+        semantic_weight: float = 0.7,
+        keyword_weight: float = 0.3,
+    ) -> List[Dict[str, Any]]:
+        """
+        Hybrid search combining semantic and keyword-based retrieval
+
+        Args:
+            query: Query text
+            k: Number of final results to return
+            where: Optional metadata filter
+            semantic_weight: Weight for semantic similarity (0-1)
+            keyword_weight: Weight for keyword matching (0-1)
+
+        Returns:
+            List of results with combined scores
+        """
+        # Normalize weights
+        total_weight = semantic_weight + keyword_weight
+        semantic_weight = semantic_weight / total_weight
+        keyword_weight = keyword_weight / total_weight
+
+        # Step 1: Get semantic search results (retrieve more for fusion)
+        semantic_k = min(k * 3, 50)  # Get 3x results for better fusion
+        semantic_results = self.similarity_search(query, k=semantic_k, where=where)
+
+        if not semantic_results:
+            return []
+
+        # Step 2: Compute keyword scores for retrieved documents
+        query_terms = self._tokenize(query)
+
+        for result in semantic_results:
+            doc_text = result.get("text", "")
+            keyword_score = self._compute_keyword_score(query_terms, doc_text)
+            result["keyword_score"] = keyword_score
+            result["semantic_score"] = result.get("score", 0)
+
+            # Combined score
+            result["hybrid_score"] = (
+                semantic_weight * result["semantic_score"] +
+                keyword_weight * result["keyword_score"]
+            )
+
+        # Step 3: Re-rank by hybrid score
+        semantic_results.sort(key=lambda x: x.get("hybrid_score", 0), reverse=True)
+
+        # Step 4: Return top k results
+        final_results = semantic_results[:k]
+
+        # Update score field to use hybrid score
+        for result in final_results:
+            result["score"] = result["hybrid_score"]
+
+        logger.debug(f"Hybrid search returned {len(final_results)} results")
+        return final_results
+
+    def _tokenize(self, text: str) -> List[str]:
+        """
+        Simple tokenization for keyword matching
+
+        Args:
+            text: Text to tokenize
+
+        Returns:
+            List of tokens (lowercase, alphanumeric only)
+        """
+        import re
+        # Split on non-alphanumeric, convert to lowercase
+        tokens = re.findall(r'\b\w+\b', text.lower())
+        # Filter very short tokens
+        return [t for t in tokens if len(t) > 1]
+
+    def _compute_keyword_score(self, query_terms: List[str], doc_text: str) -> float:
+        """
+        Compute keyword match score using BM25-like scoring
+
+        Args:
+            query_terms: Tokenized query
+            doc_text: Document text
+
+        Returns:
+            Keyword match score (0-1)
+        """
+        if not query_terms or not doc_text:
+            return 0.0
+
+        doc_tokens = self._tokenize(doc_text)
+        if not doc_tokens:
+            return 0.0
+
+        # Count query term occurrences in document
+        doc_token_set = set(doc_tokens)
+        matches = sum(1 for term in query_terms if term in doc_token_set)
+
+        # Simple TF-IDF-like scoring
+        # Term frequency component
+        tf_score = matches / len(query_terms) if query_terms else 0
+
+        # Length normalization (favor concise documents with high match ratio)
+        doc_len = len(doc_tokens)
+        avg_doc_len = 500  # Assume average doc length
+        len_norm = 1 / (1 + 0.5 * (doc_len / avg_doc_len - 1))
+
+        # Combined score (normalized to 0-1)
+        score = tf_score * (0.5 + 0.5 * len_norm)
+
+        return min(1.0, score)
+
+    def delete_by_ids(self, ids: List[str]) -> None:
+        """
+        Delete documents by IDs (alias for delete_documents)
+
+        Args:
+            ids: List of document IDs to delete
+        """
+        self.delete_documents(ids)

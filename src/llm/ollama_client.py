@@ -1,6 +1,7 @@
 """Ollama Local Model Client"""
 
-from typing import Any, Dict, List, Optional
+import json
+from typing import Any, AsyncGenerator, Dict, List, Optional
 
 import aiohttp
 import requests
@@ -63,6 +64,48 @@ class OllamaClient(BaseLLM):
 
         except Exception as e:
             logger.error(f"Ollama API error: {e}")
+            raise
+
+    async def stream_complete(
+        self,
+        messages: List[Dict[str, str]],
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        **kwargs: Any
+    ) -> AsyncGenerator[str, None]:
+        """Generate streaming completion using Ollama API"""
+
+        if not await self.is_available():
+            raise RuntimeError("Ollama server not available")
+
+        temp = temperature if temperature is not None else self.temperature
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                payload = {
+                    "model": self.model,
+                    "messages": messages,
+                    "temperature": temp,
+                    "stream": True,  # Enable streaming
+                }
+
+                async with session.post(self.api_endpoint, json=payload) as resp:
+                    if resp.status != 200:
+                        raise RuntimeError(f"Ollama API error: {resp.status}")
+
+                    # Read streaming response line by line
+                    async for line in resp.content:
+                        if line:
+                            try:
+                                data = json.loads(line.decode('utf-8'))
+                                content = data.get("message", {}).get("content", "")
+                                if content:
+                                    yield content
+                            except json.JSONDecodeError:
+                                continue
+
+        except Exception as e:
+            logger.error(f"Ollama streaming API error: {e}")
             raise
 
     async def is_available(self) -> bool:

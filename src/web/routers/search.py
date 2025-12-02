@@ -1,8 +1,10 @@
 """Search/Research mode router"""
 
 import json
+from typing import AsyncGenerator
 from fastapi import APIRouter, Request, Form
 from fastapi.responses import HTMLResponse
+from sse_starlette.sse import EventSourceResponse
 
 from src.agents import ResearchAgent
 from src.llm import LLMManager
@@ -82,3 +84,68 @@ async def search(request: Request, query: str = Form(...)):
                 "success": False
             }
         )
+
+
+async def stream_research_response(query: str) -> AsyncGenerator[dict, None]:
+    """
+    Stream research response with progress updates and summary chunks
+
+    Yields SSE events:
+    - 'progress': Stage updates (plan, search, scrape, synthesis)
+    - 'sources': List of research sources
+    - 'content': Summary text chunks
+    - 'done': Research completion
+    """
+    full_summary = ""
+    sources = []
+
+    try:
+        async for item in research_agent.stream_research(query):
+            if isinstance(item, dict):
+                if item.get("type") == "progress":
+                    yield {
+                        "event": "progress",
+                        "data": json.dumps({
+                            "stage": item.get("stage"),
+                            "message": item.get("message"),
+                            "queries": item.get("queries", [])
+                        })
+                    }
+                elif item.get("type") == "sources":
+                    sources = item.get("sources", [])
+                    yield {
+                        "event": "sources",
+                        "data": json.dumps(sources)
+                    }
+            else:
+                # String chunk from synthesis
+                full_summary += item
+                yield {
+                    "event": "content",
+                    "data": item
+                }
+
+        # Save to history after completion
+        await database.save_conversation(
+            mode="research",
+            query=query,
+            response=full_summary,
+            metadata=json.dumps({"sources": sources})
+        )
+
+        yield {"event": "done", "data": ""}
+
+    except Exception as e:
+        logger.error(f"Streaming research error: {e}")
+        yield {
+            "event": "error",
+            "data": json.dumps({"error": str(e)})
+        }
+
+
+@router.post("/stream")
+async def search_stream(query: str = Form(...)):
+    """
+    Execute streaming research query with SSE
+    """
+    return EventSourceResponse(stream_research_response(query))

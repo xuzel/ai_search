@@ -13,7 +13,8 @@ Architecture:
 
 import asyncio
 import os
-from typing import Any, Dict, List, Optional
+import uuid
+from typing import Any, Dict, List, Optional, Callable
 from pathlib import Path
 
 from src.llm.manager import LLMManager
@@ -28,7 +29,7 @@ from src.tools import (
     ScraperTool,
     CodeExecutor,
 )
-from src.workflow import TaskDecomposer, WorkflowEngine, ResultAggregator
+from src.workflow import TaskDecomposer, WorkflowEngine, ResultAggregator, TaskTracker
 from src.workflow.task_decomposer import TaskPlan, SubTask
 from src.workflow.workflow_engine import Task, ExecutionMode
 from src.utils import get_logger, extract_location, extract_stock_symbol, extract_route
@@ -119,10 +120,13 @@ class MasterAgent:
         self.workflow_engine = WorkflowEngine()
         self.result_aggregator = ResultAggregator(llm_manager)
 
+        # Initialize task tracker for progress monitoring
+        self.task_tracker = TaskTracker()
+
         # Tool executor registry
         self._register_tool_executors()
 
-        logger.info("MasterAgent initialized with all tools")
+        logger.info("MasterAgent initialized with all tools and task tracker")
 
     def _register_tool_executors(self):
         """Register all tool executor functions"""
@@ -950,3 +954,116 @@ Keep the response concise (3-5 sentences) and helpful. Use the language of the l
             prompt=query,
         )
         return vision_result
+
+    # ==================== Task Tracker Integration ====================
+
+    async def process_query_tracked(
+        self,
+        query: str,
+        uploaded_file: Optional[Any] = None,
+        file_path: Optional[str] = None,
+        progress_callback: Optional[Callable] = None,
+    ) -> Dict[str, Any]:
+        """
+        Process query with progress tracking
+
+        Args:
+            query: User query text
+            uploaded_file: Optional UploadFile object
+            file_path: Optional direct file path
+            progress_callback: Optional callback for progress updates
+
+        Returns:
+            Result dict with additional workflow_id
+        """
+        workflow_id = str(uuid.uuid4())[:8]
+        workflow_name = f"Query: {query[:50]}..."
+
+        # Create workflow with estimated tasks
+        task_names = ["Analyze Query", "Execute Tools", "Synthesize Answer"]
+        self.task_tracker.create_workflow(
+            workflow_id=workflow_id,
+            workflow_name=workflow_name,
+            task_names=task_names,
+            metadata={"query": query}
+        )
+
+        if progress_callback:
+            self.task_tracker.subscribe_workflow(progress_callback)
+
+        try:
+            self.task_tracker.start_workflow(workflow_id)
+
+            # Task 1: Analyze/Decompose
+            self.task_tracker.start_task(workflow_id, 0, "Analyzing query...")
+            file_context = None
+            if uploaded_file or file_path:
+                file_context = await self._handle_file_upload(
+                    query, uploaded_file, file_path
+                )
+                if file_context.get("direct_answer"):
+                    self.task_tracker.complete_task(workflow_id, 0, "File processed")
+                    self.task_tracker.complete_task(workflow_id, 1, "Direct answer")
+                    self.task_tracker.complete_task(workflow_id, 2, "Complete")
+                    self.task_tracker.complete_workflow(workflow_id, success=True)
+                    result = file_context["direct_answer"]
+                    result["workflow_id"] = workflow_id
+                    return result
+
+            context = {"file_context": file_context} if file_context else None
+            task_plan = await self.task_decomposer.decompose(query, context)
+            self.task_tracker.complete_task(
+                workflow_id, 0,
+                result={"subtasks": len(task_plan.subtasks)},
+                message=f"Decomposed into {len(task_plan.subtasks)} subtasks"
+            )
+
+            # Task 2: Execute Tools
+            self.task_tracker.start_task(workflow_id, 1, "Executing tools...")
+            tool_results = await self._execute_workflow(task_plan, file_context)
+            self.task_tracker.complete_task(
+                workflow_id, 1,
+                result={"tools": list(tool_results.keys())},
+                message=f"Executed {len(tool_results)} tools"
+            )
+
+            # Task 3: Synthesize
+            self.task_tracker.start_task(workflow_id, 2, "Synthesizing answer...")
+            final_result = await self._synthesize_final_answer(
+                query, task_plan, tool_results
+            )
+            self.task_tracker.complete_task(workflow_id, 2, message="Answer ready")
+
+            self.task_tracker.complete_workflow(workflow_id, success=True)
+            final_result["workflow_id"] = workflow_id
+
+            return final_result
+
+        except Exception as e:
+            logger.error(f"Tracked query failed: {e}")
+            self.task_tracker.complete_workflow(
+                workflow_id,
+                success=False,
+                message=str(e)
+            )
+            raise
+
+        finally:
+            if progress_callback:
+                self.task_tracker.unsubscribe_workflow(progress_callback)
+
+    def get_workflow_progress(self, workflow_id: str) -> Optional[Dict[str, Any]]:
+        """Get progress for a specific workflow"""
+        workflow = self.task_tracker.get_workflow(workflow_id)
+        if workflow:
+            return workflow.to_dict()
+        return None
+
+    def get_active_workflows(self) -> List[Dict[str, Any]]:
+        """Get all active workflows"""
+        workflows = self.task_tracker.get_active_workflows()
+        return [w.to_dict() for w in workflows]
+
+    def get_tracker_stats(self) -> Dict[str, Any]:
+        """Get task tracker statistics"""
+        return self.task_tracker.get_stats()

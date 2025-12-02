@@ -1,7 +1,7 @@
 """Research Agent - Conducts web research and synthesizes information"""
 
 import json
-from typing import Any, Dict, List
+from typing import Any, AsyncGenerator, Dict, List, Union
 
 from src.llm.manager import LLMManager
 from src.tools.scraper import ScraperTool
@@ -138,6 +138,133 @@ class ResearchAgent:
             print("✅ Research complete!")
 
         return result
+
+    async def stream_research(
+        self,
+        query: str,
+    ) -> AsyncGenerator[Union[Dict[str, Any], str], None]:
+        """
+        Conduct research with streaming synthesis output
+
+        Yields progress updates as dicts and the final summary as string chunks.
+
+        Args:
+            query: Research query
+
+        Yields:
+            - Dict with 'type': 'progress' and progress info
+            - Dict with 'type': 'sources' and source list
+            - String chunks of the streaming summary
+        """
+        logger.info(f"Starting streaming research on: {query}")
+
+        # Step 1: Generate search plan
+        yield {"type": "progress", "stage": "plan", "message": "Generating search plan..."}
+
+        search_plan = await self._generate_search_plan(query)
+        search_queries = search_plan.get("queries", [query])[:self.max_queries]
+
+        yield {
+            "type": "progress",
+            "stage": "plan_complete",
+            "message": f"Generated {len(search_queries)} search queries",
+            "queries": search_queries
+        }
+
+        # Step 2: Execute searches
+        yield {"type": "progress", "stage": "search", "message": "Executing searches..."}
+
+        search_results = await self.search_tool.batch_search(
+            search_queries,
+            num_results_per_query=self.top_results_per_query,
+        )
+
+        # Flatten results
+        all_results = []
+        for query_results in search_results.values():
+            all_results.extend(query_results)
+
+        yield {
+            "type": "progress",
+            "stage": "search_complete",
+            "message": f"Found {len(all_results)} results"
+        }
+
+        # Step 3: Scrape top results
+        yield {"type": "progress", "stage": "scrape", "message": "Scraping content..."}
+
+        top_urls = [r["link"] for r in all_results[:5]]
+        scraped_content = await self.scraper_tool.batch_scrape(
+            top_urls,
+            extract_text=True,
+            max_content_length=2000,
+        )
+
+        yield {
+            "type": "progress",
+            "stage": "scrape_complete",
+            "message": f"Scraped {len(scraped_content)} pages"
+        }
+
+        # Yield sources information
+        sources = [
+            {
+                "title": item.get("title", ""),
+                "url": item.get("url", ""),
+                "snippet": item.get("snippet", ""),
+            }
+            for item in all_results[:5]
+        ]
+        yield {"type": "sources", "sources": sources}
+
+        # Step 4: Stream synthesis
+        yield {"type": "progress", "stage": "synthesis", "message": "Synthesizing information..."}
+
+        async for chunk in self._stream_synthesize_information(
+            query, search_results, scraped_content
+        ):
+            yield chunk
+
+        yield {"type": "progress", "stage": "complete", "message": "Research complete!"}
+
+    async def _stream_synthesize_information(
+        self,
+        query: str,
+        search_results: Dict[str, List[Dict[str, str]]],
+        scraped_content: List[Dict[str, str]],
+    ) -> AsyncGenerator[str, None]:
+        """Stream synthesize all information into a comprehensive answer"""
+
+        # Prepare context from scraped content
+        sources_text = ""
+        for item in scraped_content:
+            if item.get("content"):
+                sources_text += f"\n---\nSource: {item.get('title', 'Untitled')}\nURL: {item.get('url', '')}\nContent:\n{item.get('content', '')}\n"
+
+        prompt = f"""Based on the following research materials, provide a comprehensive answer to the query. Include specific facts and cite the sources.
+
+Query: {query}
+
+Research Materials:
+{sources_text}
+
+Please provide:
+1. A direct answer to the query
+2. Key findings and facts
+3. Source citations
+
+Answer:"""
+
+        messages = [
+            {"role": "user", "content": prompt}
+        ]
+
+        try:
+            async for chunk in self.llm_manager.stream_complete(messages, max_tokens=1000):
+                yield chunk
+        except Exception as e:
+            logger.error(f"Error streaming synthesis: {e}")
+            yield "Unable to synthesize information"
 
     async def _generate_search_plan(self, query: str) -> Dict[str, Any]:
         """Generate search queries for the research"""

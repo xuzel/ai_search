@@ -1,6 +1,6 @@
 """LLM Provider Manager"""
 
-from typing import Any, Dict, List, Optional
+from typing import Any, AsyncGenerator, Dict, List, Optional, Union
 
 from src.utils.logger import get_logger
 from .base import BaseLLM
@@ -109,21 +109,7 @@ class LLMManager:
         Returns:
             Generated text
         """
-
-        provider_order = []
-
-        # Add preferred provider first
-        if preferred_provider and preferred_provider in self.providers:
-            provider_order.append(preferred_provider)
-
-        # Add primary provider
-        if self._primary_provider and self._primary_provider not in provider_order:
-            provider_order.append(self._primary_provider)
-
-        # Add remaining providers
-        for name in self.providers:
-            if name not in provider_order:
-                provider_order.append(name)
+        provider_order = self._get_provider_order(preferred_provider)
 
         if not provider_order:
             raise RuntimeError("No LLM providers available")
@@ -155,6 +141,93 @@ class LLMManager:
         raise RuntimeError(
             f"All LLM providers failed. Last error: {last_error}"
         )
+
+    async def stream_complete(
+        self,
+        messages: List[Dict[str, str]],
+        preferred_provider: Optional[str] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        **kwargs: Any
+    ) -> AsyncGenerator[str, None]:
+        """
+        Generate streaming completion with fallback support
+
+        Args:
+            messages: List of message dicts
+            preferred_provider: Preferred provider name
+            temperature: Sampling temperature
+            max_tokens: Maximum tokens
+            **kwargs: Additional arguments
+
+        Yields:
+            Generated text chunks as they arrive
+        """
+        provider_order = self._get_provider_order(preferred_provider)
+
+        if not provider_order:
+            raise RuntimeError("No LLM providers available")
+
+        # Try each provider in order
+        last_error = None
+        for provider_name in provider_order:
+            try:
+                provider = self.providers[provider_name]
+
+                if not await provider.is_available():
+                    logger.warning(f"{provider_name} not available for streaming, trying next...")
+                    continue
+
+                logger.debug(f"Using {provider_name} for streaming completion")
+
+                # Stream from this provider
+                async for chunk in provider.stream_complete(
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    **kwargs
+                ):
+                    yield chunk
+
+                # Successfully completed streaming
+                return
+
+            except Exception as e:
+                logger.warning(f"{provider_name} streaming failed: {e}")
+                last_error = e
+                continue
+
+        # All providers failed
+        raise RuntimeError(
+            f"All LLM streaming providers failed. Last error: {last_error}"
+        )
+
+    def _get_provider_order(self, preferred_provider: Optional[str] = None) -> List[str]:
+        """
+        Get ordered list of providers to try
+
+        Args:
+            preferred_provider: Preferred provider name
+
+        Returns:
+            Ordered list of provider names
+        """
+        provider_order = []
+
+        # Add preferred provider first
+        if preferred_provider and preferred_provider in self.providers:
+            provider_order.append(preferred_provider)
+
+        # Add primary provider
+        if self._primary_provider and self._primary_provider not in provider_order:
+            provider_order.append(self._primary_provider)
+
+        # Add remaining providers
+        for name in self.providers:
+            if name not in provider_order:
+                provider_order.append(name)
+
+        return provider_order
 
     def add_provider(self, name: str, provider: BaseLLM):
         """Add a new provider"""

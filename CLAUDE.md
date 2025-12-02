@@ -100,6 +100,7 @@ mypy src/
 - `CodeAgent`: Generates & executes Python code securely
 - `ChatAgent`: General conversation
 - `RAGAgent`: Document Q&A with vector store (ChromaDB)
+- `MasterAgent`: Central coordinator for unified query processing - handles file uploads, task decomposition, multi-tool orchestration, and result aggregation
 
 **3. LLM Manager (`src/llm/manager.py`)**
 - **Multi-provider support** with automatic fallback
@@ -125,7 +126,7 @@ mypy src/
 - `WeatherTool`: OpenWeatherMap API integration
 - `FinanceTool`: Stock data (Alpha Vantage + yfinance fallback)
 - `RoutingTool`: Directions/routes (OpenRouteService API)
-- `VisionTool`: Image analysis (Google Gemini Vision)
+- `VisionTool`: Image analysis (Aliyun Qwen3-VL-Plus)
 - `OCRTool`: Text extraction from images (PaddleOCR)
 - `SearchTool`: Web search (SerpAPI)
 - `ScraperTool`: Web content extraction (trafilatura + BeautifulSoup)
@@ -161,6 +162,7 @@ mypy src/
 **Middleware:**
 - Rate limiting (slowapi) - configurable via `RATE_LIMIT_ENABLED` env var
 - CORS (configured via `CORS_ORIGINS` env var)
+- Request timing (`TimingMiddleware`) - logs request duration, configurable via `LOG_REQUEST_TIMING` env var
 
 ## Configuration
 
@@ -232,6 +234,7 @@ mypy src/
 - **Configuration:** Set `LOG_LEVEL`, `LOG_FORMAT`, `LOG_FILE` in `.env`
 - **Formats:** standard | detailed (includes file/line) | json (structured)
 - **Logger:** Use `from src.utils import get_logger; logger = get_logger(__name__)`
+- **Request Timing:** Set `LOG_REQUEST_TIMING=true` to log request durations (logs slow requests >5s as WARNING, >10s as ERROR)
 
 ## Common Debugging
 

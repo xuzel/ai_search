@@ -1,12 +1,17 @@
 """OpenAI-compatible API Client
 
-Supports OpenAI and other OpenAI-compatible APIs (DeepSeek, Claude, etc.)
+Supports OpenAI and other OpenAI-compatible APIs (DeepSeek, DashScope, etc.)
 by allowing custom API endpoints.
+
+Streaming Support:
+- Compatible with OpenAI streaming API
+- Compatible with Aliyun DashScope (Qwen models) streaming
+- Reference: https://help.aliyun.com/zh/model-studio/developer-reference/compatibility-of-openai-with-dashscope/
 """
 
 import asyncio
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from openai import OpenAI
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -132,6 +137,70 @@ class OpenAIClient(BaseLLM):
             return response.choices[0].message.content.strip()
         except Exception as e:
             logger.error(f"{self.provider_name} API error: {e}")
+            raise
+
+    async def stream_complete(
+        self,
+        messages: List[Dict[str, str]],
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        **kwargs: Any
+    ) -> AsyncGenerator[str, None]:
+        """
+        Generate streaming completion using OpenAI-compatible API
+
+        Compatible with:
+        - OpenAI (GPT-3.5, GPT-4)
+        - Aliyun DashScope (Qwen models) - uses same stream=True pattern
+        - DeepSeek
+        - Other OpenAI-compatible APIs
+
+        Note: DashScope's Qwen3, QwQ, QVQ models ONLY support streaming output.
+        Reference: https://help.aliyun.com/zh/model-studio/user-guide/streaming
+        """
+
+        if not await self.is_available():
+            raise RuntimeError(f"{self.provider_name} API key not configured")
+
+        if not self.client:
+            raise RuntimeError(f"{self.provider_name} client not initialized")
+
+        temp = temperature if temperature is not None else self.temperature
+        tokens = max_tokens if max_tokens is not None else self.max_tokens
+
+        try:
+            # Use asyncio to run sync client in thread pool
+            loop = asyncio.get_event_loop()
+
+            # Create stream - DashScope compatible: stream=True is standard
+            stream = await loop.run_in_executor(
+                None,
+                lambda: self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    temperature=temp,
+                    max_tokens=tokens,
+                    stream=True,
+                    stream_options={"include_usage": True},  # DashScope: get token usage in last chunk
+                    **kwargs
+                )
+            )
+
+            # Iterate through the stream and yield chunks
+            for chunk in stream:
+                # Check if there's content (last chunk may only have usage info)
+                if chunk.choices and chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+
+                # Log token usage from the final chunk (optional)
+                if hasattr(chunk, 'usage') and chunk.usage:
+                    logger.debug(
+                        f"Token usage - prompt: {chunk.usage.prompt_tokens}, "
+                        f"completion: {chunk.usage.completion_tokens}"
+                    )
+
+        except Exception as e:
+            logger.error(f"{self.provider_name} streaming API error: {e}")
             raise
 
     async def is_available(self) -> bool:

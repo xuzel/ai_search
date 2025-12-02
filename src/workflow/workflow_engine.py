@@ -6,13 +6,17 @@ Features:
 - Handle task dependencies
 - Error recovery and retry logic
 - Progress tracking and callbacks
+- Checkpoint/resume for long-running workflows
 """
 
 import asyncio
+import json
+import os
 from enum import Enum
-from typing import Any, Callable, Dict, Optional, Set
-from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, List, Optional, Set
+from dataclasses import dataclass, field, asdict
 from datetime import datetime
+from pathlib import Path
 
 from src.utils.logger import get_logger
 
@@ -95,6 +99,62 @@ class WorkflowResult:
     failed_count: int
 
 
+@dataclass
+class WorkflowCheckpoint:
+    """
+    Workflow checkpoint for resuming interrupted workflows
+
+    Attributes:
+        workflow_id: Workflow identifier
+        workflow_name: Workflow name
+        mode: Execution mode
+        completed_tasks: List of completed task IDs
+        task_results: Results from completed tasks
+        failed_tasks: List of failed task IDs
+        pending_tasks: List of pending task IDs
+        created_at: Checkpoint creation time
+        metadata: Additional metadata
+    """
+    workflow_id: str
+    workflow_name: str
+    mode: str
+    completed_tasks: List[str]
+    task_results: Dict[str, Any]
+    failed_tasks: List[str]
+    pending_tasks: List[str]
+    created_at: str
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for serialization"""
+        return {
+            "workflow_id": self.workflow_id,
+            "workflow_name": self.workflow_name,
+            "mode": self.mode,
+            "completed_tasks": self.completed_tasks,
+            "task_results": self.task_results,
+            "failed_tasks": self.failed_tasks,
+            "pending_tasks": self.pending_tasks,
+            "created_at": self.created_at,
+            "metadata": self.metadata,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "WorkflowCheckpoint":
+        """Create from dictionary"""
+        return cls(
+            workflow_id=data["workflow_id"],
+            workflow_name=data["workflow_name"],
+            mode=data["mode"],
+            completed_tasks=data["completed_tasks"],
+            task_results=data["task_results"],
+            failed_tasks=data["failed_tasks"],
+            pending_tasks=data["pending_tasks"],
+            created_at=data["created_at"],
+            metadata=data.get("metadata", {}),
+        )
+
+
 class WorkflowEngine:
     """
     Orchestrates complex multi-step workflows
@@ -116,6 +176,8 @@ class WorkflowEngine:
         self,
         max_parallel_tasks: int = 5,
         default_timeout: float = 300.0,
+        checkpoint_dir: str = "./data/checkpoints",
+        enable_checkpoints: bool = True,
     ):
         """
         Initialize Workflow Engine
@@ -123,12 +185,20 @@ class WorkflowEngine:
         Args:
             max_parallel_tasks: Maximum concurrent tasks in parallel mode
             default_timeout: Default task timeout in seconds
+            checkpoint_dir: Directory to store checkpoints
+            enable_checkpoints: Whether to enable checkpoint/resume
         """
         self.max_parallel_tasks = max_parallel_tasks
         self.default_timeout = default_timeout
         self.workflows: Dict[str, "Workflow"] = {}
+        self.checkpoint_dir = checkpoint_dir
+        self.enable_checkpoints = enable_checkpoints
 
-        logger.info(f"WorkflowEngine initialized (max_parallel={max_parallel_tasks})")
+        # Create checkpoint directory if needed
+        if enable_checkpoints:
+            Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)
+
+        logger.info(f"WorkflowEngine initialized (max_parallel={max_parallel_tasks}, checkpoints={'enabled' if enable_checkpoints else 'disabled'})")
 
     def create_workflow(
         self,
@@ -436,6 +506,180 @@ class WorkflowEngine:
                 await task.on_failure(task.error)
             except Exception:
                 pass
+
+    # ==================== Checkpoint Methods ====================
+
+    def save_checkpoint(self, workflow: "Workflow") -> Optional[str]:
+        """
+        Save workflow checkpoint to disk
+
+        Args:
+            workflow: Workflow to checkpoint
+
+        Returns:
+            Checkpoint file path or None if checkpoints disabled
+        """
+        if not self.enable_checkpoints:
+            return None
+
+        checkpoint = WorkflowCheckpoint(
+            workflow_id=workflow.id,
+            workflow_name=workflow.name,
+            mode=workflow.mode.value,
+            completed_tasks=[
+                t.id for t in workflow.tasks.values()
+                if t.status == TaskStatus.COMPLETED
+            ],
+            task_results={
+                t.id: self._serialize_result(t.result)
+                for t in workflow.tasks.values()
+                if t.status == TaskStatus.COMPLETED and t.result is not None
+            },
+            failed_tasks=[
+                t.id for t in workflow.tasks.values()
+                if t.status == TaskStatus.FAILED
+            ],
+            pending_tasks=[
+                t.id for t in workflow.tasks.values()
+                if t.status == TaskStatus.PENDING
+            ],
+            created_at=datetime.now().isoformat(),
+            metadata={"task_count": len(workflow.tasks)},
+        )
+
+        filepath = os.path.join(self.checkpoint_dir, f"{workflow.id}.json")
+
+        try:
+            with open(filepath, 'w') as f:
+                json.dump(checkpoint.to_dict(), f, indent=2, default=str)
+            logger.info(f"Saved checkpoint for workflow {workflow.id}")
+            return filepath
+        except Exception as e:
+            logger.error(f"Failed to save checkpoint: {e}")
+            return None
+
+    def load_checkpoint(self, workflow_id: str) -> Optional[WorkflowCheckpoint]:
+        """
+        Load workflow checkpoint from disk
+
+        Args:
+            workflow_id: Workflow ID to load
+
+        Returns:
+            WorkflowCheckpoint or None if not found
+        """
+        filepath = os.path.join(self.checkpoint_dir, f"{workflow_id}.json")
+
+        if not os.path.exists(filepath):
+            logger.debug(f"No checkpoint found for workflow {workflow_id}")
+            return None
+
+        try:
+            with open(filepath, 'r') as f:
+                data = json.load(f)
+            checkpoint = WorkflowCheckpoint.from_dict(data)
+            logger.info(f"Loaded checkpoint for workflow {workflow_id}")
+            return checkpoint
+        except Exception as e:
+            logger.error(f"Failed to load checkpoint: {e}")
+            return None
+
+    def delete_checkpoint(self, workflow_id: str) -> bool:
+        """
+        Delete workflow checkpoint
+
+        Args:
+            workflow_id: Workflow ID
+
+        Returns:
+            True if deleted successfully
+        """
+        filepath = os.path.join(self.checkpoint_dir, f"{workflow_id}.json")
+
+        if os.path.exists(filepath):
+            try:
+                os.remove(filepath)
+                logger.info(f"Deleted checkpoint for workflow {workflow_id}")
+                return True
+            except Exception as e:
+                logger.error(f"Failed to delete checkpoint: {e}")
+                return False
+        return False
+
+    def list_checkpoints(self) -> List[WorkflowCheckpoint]:
+        """
+        List all available checkpoints
+
+        Returns:
+            List of WorkflowCheckpoint objects
+        """
+        checkpoints = []
+
+        if not os.path.exists(self.checkpoint_dir):
+            return checkpoints
+
+        for filename in os.listdir(self.checkpoint_dir):
+            if filename.endswith('.json'):
+                workflow_id = filename[:-5]  # Remove .json
+                checkpoint = self.load_checkpoint(workflow_id)
+                if checkpoint:
+                    checkpoints.append(checkpoint)
+
+        return checkpoints
+
+    async def resume_workflow(
+        self,
+        workflow: "Workflow",
+        checkpoint: WorkflowCheckpoint,
+        on_progress: Optional[Callable] = None,
+    ) -> WorkflowResult:
+        """
+        Resume workflow from checkpoint
+
+        Args:
+            workflow: Workflow to resume (should have same tasks)
+            checkpoint: Checkpoint to resume from
+            on_progress: Progress callback
+
+        Returns:
+            WorkflowResult
+        """
+        logger.info(f"Resuming workflow {workflow.id} from checkpoint")
+
+        # Restore completed task states
+        for task_id in checkpoint.completed_tasks:
+            if task_id in workflow.tasks:
+                task = workflow.tasks[task_id]
+                task.status = TaskStatus.COMPLETED
+                task.result = checkpoint.task_results.get(task_id)
+                logger.debug(f"Restored completed task: {task_id}")
+
+        # Mark failed tasks as pending for retry
+        for task_id in checkpoint.failed_tasks:
+            if task_id in workflow.tasks:
+                task = workflow.tasks[task_id]
+                task.status = TaskStatus.PENDING
+                task.error = None
+                task.attempts = 0
+                logger.debug(f"Reset failed task for retry: {task_id}")
+
+        # Execute remaining tasks
+        result = await self.execute(workflow, on_progress)
+
+        # Delete checkpoint on successful completion
+        if result.success:
+            self.delete_checkpoint(workflow.id)
+
+        return result
+
+    def _serialize_result(self, result: Any) -> Any:
+        """Serialize result for JSON storage"""
+        if result is None:
+            return None
+        if isinstance(result, (str, int, float, bool, list, dict)):
+            return result
+        # For complex objects, convert to string representation
+        return str(result)
 
 
 class Workflow:

@@ -10,7 +10,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.web import database
-from src.web.middleware import setup_rate_limiting
+from src.web.middleware import setup_rate_limiting, setup_timing_middleware
 from src.web.routers import main, search, code, chat, history, query, rag, multimodal, tools, workflow
 from src.utils import get_logger
 
@@ -55,6 +55,9 @@ app.add_middleware(
 
 # Setup rate limiting
 setup_rate_limiting(app)
+
+# Setup request timing middleware
+setup_timing_middleware(app)
 
 # Get paths
 BASE_DIR = Path(__file__).parent

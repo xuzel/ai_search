@@ -1,6 +1,5 @@
 """Chat mode router with streaming support"""
 
-import asyncio
 from typing import AsyncGenerator
 from fastapi import APIRouter, Request, Form
 from fastapi.responses import HTMLResponse
@@ -72,31 +71,25 @@ async def chat_message(request: Request, message: str = Form(...)):
 
 async def stream_chat_response(message: str) -> AsyncGenerator[str, None]:
     """
-    Stream chat response character by character
+    Stream chat response using real LLM streaming
 
-    Note: This is a simulation. For real streaming, you'd need to modify
-    the LLM client to support streaming responses.
+    Uses the ChatAgent's stream_chat method for true streaming output
+    from LLM providers (OpenAI, DashScope, DeepSeek, Ollama).
     """
+    full_response = ""
 
     try:
-        # Get response from chat agent
-        response = await chat_agent.chat(message)
+        # Use real streaming from chat agent
+        async for chunk in chat_agent.stream_chat(message):
+            full_response += chunk
+            yield chunk
 
-        # Save to history
+        # Save complete response to history after streaming completes
         await database.save_conversation(
             mode="chat",
             query=message,
-            response=response
+            response=full_response
         )
-
-        # Simulate streaming by yielding characters with small delay
-        # In production, you'd use the LLM's native streaming capability
-        words = response.split()
-        for i, word in enumerate(words):
-            if i > 0:
-                yield " "
-            yield word
-            await asyncio.sleep(0.05)  # Small delay for typing effect
 
     except Exception as e:
         logger.error(f"Chat streaming error: {e}")

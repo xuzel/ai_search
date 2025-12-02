@@ -1,10 +1,13 @@
 """RAG Document Q&A Router"""
 
 import asyncio
+import json
 from pathlib import Path
+from typing import AsyncGenerator
 
 from fastapi import APIRouter, Request, Form, UploadFile, File, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
+from sse_starlette.sse import EventSourceResponse
 
 from src.utils import get_config, get_logger
 from src.llm import LLMManager
@@ -198,7 +201,6 @@ async def query_documents(
             result['answer'] = convert_markdown_to_html(result['answer'])
 
         # Save to conversation history
-        import json
         await database.save_conversation(
             mode="rag",
             query=query,
@@ -350,3 +352,112 @@ async def reprocess_document(doc_id: int):
     except Exception as e:
         logger.error(f"Error reprocessing document {doc_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+async def stream_rag_response(
+    query: str,
+    top_k: int = 5,
+    expand_query: bool = False
+) -> AsyncGenerator[dict, None]:
+    """
+    Stream RAG query response with progress updates and answer chunks
+
+    Yields SSE events:
+    - 'progress': Stage updates (expansion, retrieve, filter, generate)
+    - 'expanded_queries': Expanded query list (if expansion enabled)
+    - 'sources': Retrieved sources
+    - 'content': Answer text chunks
+    - 'done': Completion
+    """
+    await initialize_rag()
+    full_answer = ""
+    sources = []
+
+    try:
+        # Check if there are any documents
+        stats = await database.get_rag_statistics()
+        if stats['total_documents'] == 0:
+            yield {
+                "event": "error",
+                "data": json.dumps({"error": "No documents uploaded yet. Please upload documents first."})
+            }
+            return
+
+        async for item in rag_agent.stream_query(query, top_k=top_k, expand_query=expand_query):
+            if isinstance(item, dict):
+                item_type = item.get("type")
+
+                if item_type == "progress":
+                    yield {
+                        "event": "progress",
+                        "data": json.dumps({
+                            "stage": item.get("stage"),
+                            "message": item.get("message")
+                        })
+                    }
+                elif item_type == "expanded_queries":
+                    yield {
+                        "event": "expanded_queries",
+                        "data": json.dumps({"queries": item.get("queries", [])})
+                    }
+                elif item_type == "sources":
+                    sources = item.get("sources", [])
+                    # Convert sources for JSON serialization
+                    serializable_sources = []
+                    for s in sources:
+                        serializable_sources.append({
+                            "text": s.get("text", ""),
+                            "score": float(s.get("score", 0)),
+                            "metadata": s.get("metadata", {})
+                        })
+                    yield {
+                        "event": "sources",
+                        "data": json.dumps(serializable_sources)
+                    }
+            else:
+                # String chunk from streaming answer
+                full_answer += item
+                yield {
+                    "event": "content",
+                    "data": item
+                }
+
+        # Save to conversation history
+        await database.save_conversation(
+            mode="rag",
+            query=query,
+            response=full_answer,
+            metadata=json.dumps({
+                "num_sources": len(sources),
+                "top_k": top_k,
+                "expand_query": expand_query
+            })
+        )
+
+        yield {"event": "done", "data": ""}
+
+    except Exception as e:
+        logger.error(f"Streaming RAG query error: {e}", exc_info=True)
+        yield {
+            "event": "error",
+            "data": json.dumps({"error": str(e)})
+        }
+
+
+@router.post("/rag/query/stream")
+@limiter.limit(get_limit("query"))
+async def query_documents_stream(
+    request: Request,
+    query: str = Form(...),
+    top_k: int = Form(5),
+    expand_query: bool = Form(False)
+):
+    """
+    Query documents using RAG with streaming response
+
+    Args:
+        query: User question
+        top_k: Number of relevant chunks to retrieve
+        expand_query: Whether to expand query for better retrieval
+    """
+    return EventSourceResponse(stream_rag_response(query, top_k=top_k, expand_query=expand_query))

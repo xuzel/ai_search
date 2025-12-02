@@ -1,11 +1,13 @@
 """Code execution mode router"""
 
 import json
+from typing import AsyncGenerator
 from fastapi import APIRouter, Request, Form
 from fastapi.responses import HTMLResponse
 from pygments import highlight
 from pygments.lexers import PythonLexer
 from pygments.formatters import HtmlFormatter
+from sse_starlette.sse import EventSourceResponse
 
 from src.agents import CodeAgent
 from src.llm import LLMManager
@@ -98,3 +100,104 @@ async def execute_code(request: Request, query: str = Form(...)):
                 "success": False
             }
         )
+
+
+async def stream_code_response(query: str, auto_fix: bool = True) -> AsyncGenerator[dict, None]:
+    """
+    Stream code execution response with progress updates and explanation chunks
+
+    Yields SSE events:
+    - 'progress': Stage updates (generate, validate, execute, explain)
+    - 'code': Generated or fixed code
+    - 'output': Execution output
+    - 'error': Execution errors
+    - 'fix_attempt': Auto-fix attempts info
+    - 'content': Streaming explanation chunks
+    - 'done': Completion
+    """
+    final_code = ""
+    final_output = ""
+    final_error = ""
+    success = False
+
+    try:
+        async for item in code_agent.stream_solve(query, auto_fix=auto_fix):
+            if isinstance(item, dict):
+                item_type = item.get("type")
+
+                if item_type == "progress":
+                    yield {
+                        "event": "progress",
+                        "data": json.dumps({
+                            "stage": item.get("stage"),
+                            "message": item.get("message")
+                        })
+                    }
+                elif item_type == "code":
+                    final_code = item.get("code", "")
+                    yield {
+                        "event": "code",
+                        "data": json.dumps({"code": final_code})
+                    }
+                elif item_type == "output":
+                    final_output = item.get("output", "")
+                    success = True
+                    yield {
+                        "event": "output",
+                        "data": json.dumps({"output": final_output})
+                    }
+                elif item_type == "error":
+                    final_error = item.get("error", "")
+                    yield {
+                        "event": "error",
+                        "data": json.dumps({
+                            "error": final_error,
+                            "stage": item.get("stage")
+                        })
+                    }
+                elif item_type == "fix_attempt":
+                    yield {
+                        "event": "fix_attempt",
+                        "data": json.dumps({
+                            "attempt": item.get("attempt"),
+                            "error": item.get("error"),
+                            "message": item.get("message")
+                        })
+                    }
+            else:
+                # String chunk from streaming explanation
+                yield {
+                    "event": "content",
+                    "data": item
+                }
+
+        # Save to history after completion
+        await database.save_conversation(
+            mode="code",
+            query=query,
+            response="",  # Explanation was streamed
+            metadata=json.dumps({
+                "code": final_code,
+                "output": final_output,
+                "error": final_error,
+                "success": success
+            })
+        )
+
+        yield {"event": "done", "data": ""}
+
+    except Exception as e:
+        logger.error(f"Streaming code execution error: {e}")
+        yield {
+            "event": "error",
+            "data": json.dumps({"error": str(e)})
+        }
+
+
+@router.post("/stream")
+@limiter.limit(get_limit("compute"))
+async def code_stream(request: Request, query: str = Form(...), auto_fix: bool = Form(True)):
+    """
+    Execute streaming code generation with auto-fix support
+    """
+    return EventSourceResponse(stream_code_response(query, auto_fix=auto_fix))

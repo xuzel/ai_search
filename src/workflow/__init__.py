@@ -7,6 +7,7 @@ from .workflow_engine import (
     TaskStatus,
     ExecutionMode,
     WorkflowResult,
+    WorkflowCheckpoint,
 )
 from .task_decomposer import (
     TaskDecomposer,
@@ -17,6 +18,12 @@ from .result_aggregator import (
     ResultAggregator,
     AggregatedResult,
 )
+from .task_tracker import (
+    TaskTracker,
+    TaskProgress,
+    WorkflowProgress,
+    TaskStatus as TrackerTaskStatus,
+)
 
 __all__ = [
     "WorkflowEngine",
@@ -25,9 +32,13 @@ __all__ = [
     "TaskStatus",
     "ExecutionMode",
     "WorkflowResult",
+    "WorkflowCheckpoint",
     "TaskDecomposer",
     "TaskPlan",
     "SubTask",
     "ResultAggregator",
     "AggregatedResult",
+    "TaskTracker",
+    "TaskProgress",
+    "WorkflowProgress",
 ]
